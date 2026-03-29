@@ -6,8 +6,11 @@ const os = require('os');
 const config = require('./lib/config');
 const ServerProcess = require('./lib/process');
 
+const fs = require('fs');
+
 const PORT = process.env.PORT || 24802;
 const CONFIG_PATH = process.env.CONFIG_PATH || path.join(__dirname, 'input-leap.conf');
+const LAYOUT_PATH = path.join(__dirname, 'layout.json');
 
 const app = express();
 const server = http.createServer(app);
@@ -42,7 +45,26 @@ app.post('/api/config', (req, res) => {
 });
 
 app.get('/api/hostname', (req, res) => {
-  res.json({ hostname: os.hostname() });
+  const platformMap = { darwin: 'macos', win32: 'windows', linux: 'linux' };
+  res.json({
+    hostname: os.hostname(),
+    platform: platformMap[process.platform] || 'linux',
+  });
+});
+
+app.get('/api/layout', (req, res) => {
+  try {
+    if (fs.existsSync(LAYOUT_PATH)) {
+      res.json(JSON.parse(fs.readFileSync(LAYOUT_PATH, 'utf8')));
+    } else {
+      res.json(null);
+    }
+  } catch { res.json(null); }
+});
+
+app.post('/api/layout', (req, res) => {
+  fs.writeFileSync(LAYOUT_PATH, JSON.stringify(req.body, null, 2), 'utf8');
+  res.json({ ok: true });
 });
 
 app.get('/api/status', (req, res) => {

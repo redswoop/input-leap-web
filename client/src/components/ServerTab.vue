@@ -92,7 +92,7 @@
 import { ref, computed } from 'vue'
 import { useConfig } from '../composables/useConfig.js'
 
-const { options, serverName, configText, saveConfig } = useConfig()
+const { options, serverName, configText, saveAll } = useConfig()
 const copied = ref(false)
 
 const featureToggles = [
@@ -113,7 +113,7 @@ const highlightedLines = computed(() => {
 })
 
 async function start() {
-  await saveConfig()
+  await saveAll()
   await fetch('/api/server/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -126,7 +126,7 @@ async function stop() {
 }
 
 async function restart() {
-  await saveConfig()
+  await saveAll()
   await fetch('/api/server/restart', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -135,7 +135,7 @@ async function restart() {
 }
 
 async function save() {
-  await saveConfig()
+  await saveAll()
 }
 
 async function copy() {

@@ -1,9 +1,10 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 const screens = ref([])
 const links = ref({})
 const aliases = ref({})
 const serverName = ref('')
+const serverPlatform = ref('')
 const options = ref({
   relativeMouseMoves: 'false',
   screenSaverSync: 'true',
@@ -30,11 +31,11 @@ const configText = computed(() => {
   lines.push('')
 
   // Aliases
-  const hasAliases = Object.values(aliases.value).some(a => a.length > 0)
+  const hasAliases = Object.values(aliases.value).some(a => a?.length > 0)
   if (hasAliases) {
     lines.push('section: aliases')
     for (const [name, aliasList] of Object.entries(aliases.value)) {
-      if (aliasList.length === 0) continue
+      if (!aliasList?.length) continue
       lines.push(`\t${name}:`)
       for (const a of aliasList) lines.push(`\t\t${a}`)
     }
@@ -86,19 +87,88 @@ async function saveConfig() {
   })
 }
 
-let hostnameLoaded = false
+async function saveLayout() {
+  await fetch('/api/layout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      screens: screens.value.map(s => ({
+        name: s.name, x: s.x, y: s.y, w: s.w, h: s.h,
+        os: s.os || null, options: s.options || {},
+      })),
+    }),
+  })
+}
 
-async function loadHostname() {
-  if (hostnameLoaded) return
-  hostnameLoaded = true
+async function saveAll() {
+  await Promise.all([saveConfig(), saveLayout()])
+}
+
+// Debounced layout save — called on drag/resize
+let layoutSaveTimer = null
+function debouncedSaveLayout() {
+  clearTimeout(layoutSaveTimer)
+  layoutSaveTimer = setTimeout(() => saveLayout(), 1000)
+}
+
+// ── Init ──
+
+let initDone = false
+
+async function init() {
+  if (initDone) return
+  initDone = true
+
+  // Fetch hostname + platform
   try {
     const res = await fetch('/api/hostname')
-    const { hostname } = await res.json()
-    serverName.value = hostname
+    const data = await res.json()
+    serverName.value = data.hostname
+    serverPlatform.value = data.platform || ''
+  } catch { /* ignore */ }
+
+  // Try loading saved layout
+  try {
+    const res = await fetch('/api/layout')
+    const layout = await res.json()
+    if (layout?.screens?.length) {
+      screens.value = layout.screens.map(s => ({
+        name: s.name, x: s.x, y: s.y, w: s.w, h: s.h,
+        os: s.os || null, options: s.options || {},
+      }))
+    }
+  } catch { /* ignore */ }
+
+  // Load existing InputLeap config and merge options/aliases
+  try {
+    const res = await fetch('/api/config')
+    const cfg = await res.json()
+    if (cfg) {
+      // Merge global options
+      if (cfg.options && Object.keys(cfg.options).length) {
+        options.value = { ...options.value, ...cfg.options }
+      }
+      // Merge aliases
+      if (cfg.aliases && Object.keys(cfg.aliases).length) {
+        aliases.value = cfg.aliases
+      }
+      // Merge per-screen options from config into layout screens
+      if (cfg.screens) {
+        for (const [name, opts] of Object.entries(cfg.screens)) {
+          const existing = screens.value.find(s => s.name === name)
+          if (existing && Object.keys(opts).length) {
+            existing.options = { ...existing.options, ...opts }
+          }
+        }
+      }
+    }
   } catch { /* ignore */ }
 }
 
 export function useConfig() {
-  loadHostname()
-  return { screens, links, aliases, options, serverName, configText, saveConfig, buildJSON }
+  init()
+  return {
+    screens, links, aliases, options, serverName, serverPlatform,
+    configText, saveConfig, saveLayout, saveAll, debouncedSaveLayout, buildJSON,
+  }
 }

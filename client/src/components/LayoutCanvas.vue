@@ -17,7 +17,7 @@ const COLORS = ['#4a9eff', '#ff6b6b', '#51cf66', '#ffd43b', '#cc5de8', '#ff922b'
 
 const container = ref(null)
 const canvas = ref(null)
-const { screens, links, serverName } = useConfig()
+const { screens, links, serverName, debouncedSaveLayout } = useConfig()
 
 let ctx = null
 let dragging = null
@@ -92,12 +92,14 @@ function addScreen(name, w = 280, h = 175) {
   const cy = rect.height / 2 - h / 2 + screens.value.length * 20
   screens.value.push({ name, x: snap(cx), y: snap(cy), w, h, options: {} })
   updateLinks()
+  debouncedSaveLayout()
 }
 
 function removeScreen(index) {
   if (screens.value[index]?.name === serverName.value) return
   screens.value.splice(index, 1)
   if (selected >= screens.value.length) selected = -1
+  debouncedSaveLayout()
   updateLinks()
 }
 
@@ -384,7 +386,10 @@ function onMouseMove(e) {
 }
 
 function onMouseUp() {
-  if (dragging || resizing) updateLinks()
+  if (dragging || resizing) {
+    updateLinks()
+    debouncedSaveLayout()
+  }
   dragging = null
   resizing = null
 }
