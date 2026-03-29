@@ -1,8 +1,40 @@
 <template>
   <div class="screen-settings">
     <div class="settings-header">
-      <span class="settings-title">{{ screen.name }}</span>
+      <div class="settings-title-row">
+        <span class="settings-title">{{ screen.name }}</span>
+        <span v-if="screen.name === serverName" class="server-tag">server</span>
+      </div>
       <span class="settings-subtitle">Screen Settings</span>
+    </div>
+
+    <!-- Switch Corners -->
+    <div class="settings-section">
+      <div class="section-label">Switch Corners</div>
+      <p class="section-hint">Prevent screen switching when cursor is in a corner</p>
+      <div class="corner-viz">
+        <div class="corner-screen">
+          <button
+            v-for="corner in corners"
+            :key="corner.key"
+            class="corner-dot"
+            :class="[corner.pos, { active: isCornerActive(corner.key) }]"
+            @click="toggleCorner(corner.key)"
+            :title="corner.label"
+          />
+          <span class="corner-screen-label">{{ screen.name }}</span>
+        </div>
+      </div>
+      <div class="input-group" style="margin-top:12px;">
+        <label class="input-label">Corner dead zone size</label>
+        <div class="input-with-unit">
+          <input class="input" type="number"
+            :value="screen.options?.switchCornerSize || ''"
+            @input="setOpt('switchCornerSize', $event.target.value)"
+            placeholder="0">
+          <span class="input-unit">px</span>
+        </div>
+      </div>
     </div>
 
     <!-- Aliases -->
@@ -51,7 +83,14 @@ const props = defineProps({
   screen: { type: Object, required: true }
 })
 
-const { aliases } = useConfig()
+const { aliases, serverName } = useConfig()
+
+const corners = [
+  { key: 'top-left', label: 'Top Left', pos: 'pos-tl' },
+  { key: 'top-right', label: 'Top Right', pos: 'pos-tr' },
+  { key: 'bottom-left', label: 'Bottom Left', pos: 'pos-bl' },
+  { key: 'bottom-right', label: 'Bottom Right', pos: 'pos-br' },
+]
 
 const modifiers = [
   { key: 'shift', label: 'Shift' },
@@ -70,6 +109,31 @@ const toggleOpts = [
   { key: 'halfDuplexScrollLock', label: 'Half-duplex Scroll Lock' },
   { key: 'preserveFocus', label: 'Preserve focus' },
 ]
+
+function getActiveCorners() {
+  const val = props.screen.options?.switchCorners || ''
+  return corners.map(c => c.key).filter(k => val.includes('+' + k))
+}
+
+function isCornerActive(key) {
+  return getActiveCorners().includes(key)
+}
+
+function toggleCorner(key) {
+  const active = getActiveCorners()
+  const idx = active.indexOf(key)
+  if (idx >= 0) {
+    active.splice(idx, 1)
+  } else {
+    active.push(key)
+  }
+
+  if (active.length === 0) {
+    setOpt('switchCorners', '')
+  } else {
+    setOpt('switchCorners', 'none ' + active.map(k => '+' + k).join(' '))
+  }
+}
 
 function setOpt(key, value) {
   if (!props.screen.options) props.screen.options = {}
@@ -111,12 +175,31 @@ function updateAlias(index, value) {
   background: var(--accent-bg);
 }
 
+.settings-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .settings-title {
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 500;
   color: var(--accent);
-  display: block;
+}
+
+.server-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
 }
 
 .settings-subtitle {
@@ -147,6 +230,90 @@ function updateAlias(index, value) {
   margin-bottom: 10px;
 }
 
+/* Corner visualization */
+.corner-viz {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.corner-screen {
+  position: relative;
+  width: 160px;
+  height: 100px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-inset);
+}
+
+.corner-screen-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.corner-dot {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.corner-dot:hover {
+  border-color: var(--accent-border);
+  background: var(--bg-hover);
+}
+
+.corner-dot.active {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px rgba(232, 168, 48, 0.2);
+}
+
+.corner-dot.active::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.pos-tl { top: -4px; left: -4px; }
+.pos-tr { top: -4px; right: -4px; }
+.pos-bl { bottom: -4px; left: -4px; }
+.pos-br { bottom: -4px; right: -4px; }
+
+.input-with-unit {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-unit .input {
+  padding-right: 36px;
+}
+
+.input-unit {
+  position: absolute;
+  right: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* Aliases */
 .alias-row {
   display: flex;
   gap: 6px;

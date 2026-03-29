@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { WebSocketServer } = require('ws');
 const path = require('path');
+const os = require('os');
 const config = require('./lib/config');
 const ServerProcess = require('./lib/process');
 
@@ -38,6 +39,10 @@ app.get('/api/config', (req, res) => {
 app.post('/api/config', (req, res) => {
   config.save(CONFIG_PATH, req.body);
   res.json({ ok: true });
+});
+
+app.get('/api/hostname', (req, res) => {
+  res.json({ hostname: os.hostname() });
 });
 
 app.get('/api/status', (req, res) => {

@@ -17,16 +17,18 @@ const COLORS = ['#4a9eff', '#ff6b6b', '#51cf66', '#ffd43b', '#cc5de8', '#ff922b'
 
 const container = ref(null)
 const canvas = ref(null)
-const { screens, links } = useConfig()
+const { screens, links, serverName } = useConfig()
 
 let ctx = null
 let dragging = null
 let resizing = null
 let selected = -1
+let resizeObserver = null
 
 function resize() {
   if (!container.value || !canvas.value) return
   const rect = container.value.getBoundingClientRect()
+  if (rect.width === 0 || rect.height === 0) return
   const dpr = window.devicePixelRatio || 1
   canvas.value.width = rect.width * dpr
   canvas.value.height = rect.height * dpr
@@ -36,25 +38,47 @@ function resize() {
   draw()
 }
 
+function ensureServerScreen() {
+  if (!serverName.value) return
+  const exists = screens.value.some(s => s.name === serverName.value)
+  if (!exists) {
+    const rect = container.value?.getBoundingClientRect()
+    const cx = rect ? Math.round(rect.width / 2) : 400
+    const cy = rect ? Math.round(rect.height / 2 - 80) : 200
+    screens.value.unshift({ name: serverName.value, x: cx - 200, y: cy, w: 400, h: 140, options: {} })
+    updateLinks()
+  }
+}
+
 onMounted(() => {
   ctx = canvas.value.getContext('2d')
-  resize()
-  window.addEventListener('resize', resize)
 
-  // Default layout if empty
-  if (screens.value.length === 0) {
-    const cx = Math.round(canvas.value.width / 2)
-    const topY = Math.round(canvas.value.height / 2 - 100)
+  // ResizeObserver catches log panel collapse, tab switches, window resize
+  resizeObserver = new ResizeObserver(() => resize())
+  resizeObserver.observe(container.value)
+
+  resize()
+
+  // Wait for hostname to load, then ensure server screen exists
+  watch(serverName, () => ensureServerScreen(), { immediate: true })
+
+  // Default layout if empty and no server name yet
+  if (screens.value.length === 0 && !serverName.value) {
+    const rect = container.value.getBoundingClientRect()
+    const cx = Math.round(rect.width / 2)
+    const topY = Math.round(rect.height / 2 - 160)
     screens.value.push(
-      { name: 'ultrawide', x: cx - 160, y: topY, w: 320, h: 90, options: {} },
-      { name: 'laptop-left', x: cx - 160, y: topY + 90, w: 160, h: 100, options: {} },
-      { name: 'laptop-right', x: cx, y: topY + 90, w: 160, h: 100, options: {} },
+      { name: 'server', x: cx - 280, y: topY, w: 560, h: 160, options: {} },
+      { name: 'laptop-left', x: cx - 280, y: topY + 160, w: 280, h: 175, options: {} },
+      { name: 'laptop-right', x: cx, y: topY + 160, w: 280, h: 175, options: {} },
     )
     updateLinks()
   }
 })
 
-onUnmounted(() => window.removeEventListener('resize', resize))
+onUnmounted(() => {
+  resizeObserver?.disconnect()
+})
 
 watch(screens, () => draw(), { deep: true })
 
@@ -62,14 +86,16 @@ const emit = defineEmits(['select'])
 
 defineExpose({ addScreen, removeScreen })
 
-function addScreen(name, w = 160, h = 100) {
-  const cx = canvas.value.width / 2 - w / 2
-  const cy = canvas.value.height / 2 - h / 2 + screens.value.length * 20
+function addScreen(name, w = 280, h = 175) {
+  const rect = container.value.getBoundingClientRect()
+  const cx = rect.width / 2 - w / 2
+  const cy = rect.height / 2 - h / 2 + screens.value.length * 20
   screens.value.push({ name, x: snap(cx), y: snap(cy), w, h, options: {} })
   updateLinks()
 }
 
 function removeScreen(index) {
+  if (screens.value[index]?.name === serverName.value) return
   screens.value.splice(index, 1)
   if (selected >= screens.value.length) selected = -1
   updateLinks()
@@ -85,14 +111,15 @@ function snap(v) { return Math.round(v / GRID_SIZE) * GRID_SIZE }
 // ── Drawing ──
 
 function draw() {
-  if (!ctx) return
-  const c = canvas.value
-  ctx.clearRect(0, 0, c.width, c.height)
+  if (!ctx || !container.value) return
+  const rect = container.value.getBoundingClientRect()
+  const w = rect.width, h = rect.height
+  ctx.clearRect(0, 0, w, h)
 
   // Grid dots — warm amber tint
   ctx.fillStyle = '#2a2520'
-  for (let x = 0; x < c.width; x += GRID_SIZE * 8) {
-    for (let y = 0; y < c.height; y += GRID_SIZE * 8) {
+  for (let x = 0; x < w; x += GRID_SIZE * 8) {
+    for (let y = 0; y < h; y += GRID_SIZE * 8) {
       ctx.fillRect(x, y, 1, 1)
     }
   }
@@ -137,11 +164,36 @@ function draw() {
     ctx.stroke()
 
     // Label
+    const isServer = serverName.value && s.name === serverName.value
+    const label = isServer ? s.name + ' (server)' : s.name
+
     ctx.fillStyle = '#e8e9ee'
     ctx.font = '500 13px Outfit, system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(s.name, s.x + s.w / 2, s.y + s.h / 2)
+
+    // Measure and clamp label
+    const maxLabelW = s.w - 16
+    let displayLabel = label
+    while (ctx.measureText(displayLabel).width > maxLabelW && displayLabel.length > 3) {
+      displayLabel = displayLabel.slice(0, -4) + '...'
+    }
+
+    // Crown icon for server
+    if (isServer) {
+      const lw = ctx.measureText(displayLabel).width
+      const crownX = s.x + s.w / 2 - lw / 2 - 14
+      const crownY = s.y + s.h / 2 - 5
+      ctx.fillStyle = '#e8a830'
+      ctx.font = '10px sans-serif'
+      ctx.textAlign = 'left'
+      ctx.fillText('♛', crownX, crownY + 9)
+      ctx.textAlign = 'center'
+      ctx.fillStyle = '#e8e9ee'
+      ctx.font = '500 13px Outfit, system-ui, sans-serif'
+    }
+
+    ctx.fillText(displayLabel, s.x + s.w / 2, s.y + s.h / 2)
 
     // Dimensions
     ctx.fillStyle = '#666'
@@ -154,6 +206,47 @@ function draw() {
       ctx.beginPath()
       ctx.roundRect(s.x + s.w - HANDLE_SIZE - 1, s.y + s.h - HANDLE_SIZE - 1, HANDLE_SIZE + 1, HANDLE_SIZE + 1, 2)
       ctx.fill()
+    }
+
+    // Server border accent — drawn inside the screen
+    if (isServer) {
+      ctx.strokeStyle = '#e8a830aa'
+      ctx.lineWidth = 2
+      ctx.setLineDash([6, 4])
+      ctx.beginPath()
+      ctx.roundRect(s.x + 3, s.y + 3, s.w - 6, s.h - 6, 4)
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
+
+    // Dead corner indicators
+    const cornerVal = s.options?.switchCorners || ''
+    const cornerSize = parseInt(s.options?.switchCornerSize) || 0
+    if (cornerVal.includes('+')) {
+      // Scale proportionally with generous minimum
+      const csW = Math.max(14, Math.min(s.w * 0.2, cornerSize * s.w / 1920))
+      const csH = Math.max(14, Math.min(s.h * 0.2, cornerSize * s.h / 1080))
+
+      ctx.fillStyle = '#e8a83030'
+      ctx.strokeStyle = '#e8a83050'
+      ctx.lineWidth = 1
+
+      if (cornerVal.includes('+top-left')) {
+        ctx.fillRect(s.x, s.y, csW, csH)
+        ctx.strokeRect(s.x, s.y, csW, csH)
+      }
+      if (cornerVal.includes('+top-right')) {
+        ctx.fillRect(s.x + s.w - csW, s.y, csW, csH)
+        ctx.strokeRect(s.x + s.w - csW, s.y, csW, csH)
+      }
+      if (cornerVal.includes('+bottom-left')) {
+        ctx.fillRect(s.x, s.y + s.h - csH, csW, csH)
+        ctx.strokeRect(s.x, s.y + s.h - csH, csW, csH)
+      }
+      if (cornerVal.includes('+bottom-right')) {
+        ctx.fillRect(s.x + s.w - csW, s.y + s.h - csH, csW, csH)
+        ctx.strokeRect(s.x + s.w - csW, s.y + s.h - csH, csW, csH)
+      }
     }
   })
 }

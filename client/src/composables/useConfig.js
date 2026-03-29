@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 const screens = ref([])
 const links = ref({})
 const aliases = ref({})
+const serverName = ref('')
 const options = ref({
   relativeMouseMoves: 'false',
   screenSaverSync: 'true',
@@ -85,6 +86,19 @@ async function saveConfig() {
   })
 }
 
+let hostnameLoaded = false
+
+async function loadHostname() {
+  if (hostnameLoaded) return
+  hostnameLoaded = true
+  try {
+    const res = await fetch('/api/hostname')
+    const { hostname } = await res.json()
+    serverName.value = hostname
+  } catch { /* ignore */ }
+}
+
 export function useConfig() {
-  return { screens, links, aliases, options, configText, saveConfig, buildJSON }
+  loadHostname()
+  return { screens, links, aliases, options, serverName, configText, saveConfig, buildJSON }
 }

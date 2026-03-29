@@ -47,7 +47,7 @@ function logClass(line) {
 }
 
 .log-panel.collapsed { height: 36px !important; }
-.log-panel.expanded { height: 190px; }
+.log-panel.expanded { height: 150px; max-height: 150px; }
 
 .log-header {
   display: flex;
@@ -94,9 +94,9 @@ function logClass(line) {
   overflow-y: auto;
   padding: 4px 0;
   font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1;
-  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
 }
 
 .log-content::-webkit-scrollbar { width: 4px; }

@@ -14,7 +14,8 @@
         >
           <span class="color-pip" :style="{ background: colors[i % colors.length] }" />
           <span class="name">{{ s.name }}</span>
-          <button class="delete-btn" @click.stop="$emit('remove', i)" title="Remove">&times;</button>
+          <span v-if="s.name === serverName" class="server-tag">server</span>
+          <button v-if="s.name !== serverName" class="delete-btn" @click.stop="$emit('remove', i)" title="Remove">&times;</button>
         </li>
       </ul>
       <button class="btn btn-accent btn-full" @click="addScreen">+ Add Screen</button>
@@ -29,7 +30,7 @@ const props = defineProps({
   selected: { type: Number, default: -1 }
 })
 
-const { screens } = useConfig()
+const { screens, serverName } = useConfig()
 const colors = ['#4a9eff', '#ff6b6b', '#51cf66', '#ffd43b', '#cc5de8', '#ff922b']
 
 const emit = defineEmits(['remove', 'add', 'select'])
@@ -48,5 +49,20 @@ function addScreen() {
 .screen-item.selected {
   border-color: var(--accent-border) !important;
   background: var(--accent-bg) !important;
+}
+
+.server-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 </style>

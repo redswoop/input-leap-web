@@ -7,8 +7,8 @@
         <section class="card">
           <h2 class="card-title">Server Controls</h2>
           <div class="input-group">
-            <label class="input-label">Server screen name</label>
-            <input class="input" v-model="serverName" type="text" placeholder="e.g. desktop" spellcheck="false">
+            <label class="input-label">Server hostname (auto-detected)</label>
+            <input class="input" :value="serverName" type="text" readonly style="opacity:0.7;cursor:default;">
           </div>
           <div class="btn-row">
             <button class="btn btn-accent btn-lg" @click="start">Start Server</button>
@@ -92,8 +92,7 @@
 import { ref, computed } from 'vue'
 import { useConfig } from '../composables/useConfig.js'
 
-const { options, configText, saveConfig } = useConfig()
-const serverName = ref('')
+const { options, serverName, configText, saveConfig } = useConfig()
 const copied = ref(false)
 
 const featureToggles = [
