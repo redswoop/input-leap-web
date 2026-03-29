@@ -1,0 +1,34 @@
+{
+  "name": "input-leap-web",
+  "version": "0.1.0",
+  "description": "A modern web UI for configuring InputLeap KVM servers",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "concurrently \"node server.js\" \"cd client && npx vite --host\"",
+    "build": "cd client && npm run build",
+    "postinstall": "cd client && npm install"
+  },
+  "keywords": [
+    "inputleap",
+    "kvm",
+    "synergy",
+    "barrier",
+    "mouse-sharing",
+    "keyboard-sharing"
+  ],
+  "author": "redswoop",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/redswoop/input-leap-web.git"
+  },
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^5.2.1",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
