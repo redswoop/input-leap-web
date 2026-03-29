@@ -8,91 +8,71 @@
       <span class="settings-subtitle">Screen Settings</span>
     </div>
 
-    <!-- OS Type -->
-    <div class="settings-section">
-      <div class="section-label">Operating System</div>
-      <div v-if="isServer" class="os-detected">
-        <span class="os-icon">{{ osIcon(serverPlatform) }}</span>
-        <span>{{ osLabel(serverPlatform) }}</span>
-        <span class="os-auto">auto-detected</span>
-      </div>
-      <div v-else class="input-group" style="margin-bottom:0;">
-        <select class="input" :value="screen.os || ''" @change="screen.os = $event.target.value">
-          <option value="">Select OS...</option>
+    <!-- OS + Preset -->
+    <div class="settings-section compact">
+      <div class="inline-row">
+        <span class="section-label" style="margin-bottom:0">OS</span>
+        <div v-if="isServer" class="os-inline">{{ osIcon(serverPlatform) }} {{ osLabel(serverPlatform) }}</div>
+        <select v-else class="input input-sm" :value="screen.os || ''" @change="screen.os = $event.target.value" style="flex:1;">
+          <option value="">Select...</option>
           <option value="macos">macOS</option>
           <option value="windows">Windows</option>
           <option value="linux">Linux</option>
         </select>
       </div>
+      <button v-if="presetAvailable" class="btn btn-accent btn-sm" style="width:100%;margin-top:6px;" @click="applyPreset">
+        Apply recommended key mapping
+      </button>
+    </div>
 
-      <!-- Preset button -->
-      <div v-if="presetAvailable" class="preset-box">
-        <div class="preset-desc">{{ presetDescription }}</div>
-        <button class="btn btn-accent" style="width:100%;margin-top:8px;" @click="applyPreset">
-          Apply recommended mapping
-        </button>
+    <!-- Modifier Keys (compact 2-col grid) -->
+    <div class="settings-section compact">
+      <div class="section-label">Modifiers</div>
+      <div class="mod-grid">
+        <div v-for="mod in displayModifiers" :key="mod.key" class="mod-cell">
+          <label class="mod-label">{{ mod.label }}</label>
+          <select class="input input-sm" :value="screen.options?.[mod.key] || ''" @change="setOpt(mod.key, $event.target.value)">
+            <option value="">default</option>
+            <option v-for="v in displayModValues" :key="v.value" :value="v.value">{{ v.label }}</option>
+          </select>
+        </div>
       </div>
     </div>
 
-    <!-- Switch Corners -->
-    <div class="settings-section">
-      <div class="section-label">Switch Corners</div>
-      <p class="section-hint">Prevent screen switching when cursor is in a corner</p>
-      <div class="corner-viz">
-        <div class="corner-screen">
-          <button
-            v-for="corner in corners"
-            :key="corner.key"
-            class="corner-dot"
-            :class="[corner.pos, { active: isCornerActive(corner.key) }]"
-            @click="toggleCorner(corner.key)"
-            :title="corner.label"
-          />
-          <span class="corner-screen-label">{{ screen.name }}</span>
-        </div>
-      </div>
-      <div class="input-group" style="margin-top:12px;">
-        <label class="input-label">Corner dead zone size</label>
-        <div class="input-with-unit">
-          <input class="input" type="number"
+    <!-- Corners (inline) -->
+    <div class="settings-section compact">
+      <div class="inline-row" style="margin-bottom:6px;">
+        <span class="section-label" style="margin-bottom:0">Corners</span>
+        <div class="input-with-unit" style="width:80px;">
+          <input class="input input-sm" type="number"
             :value="screen.options?.switchCornerSize || ''"
             @input="setOpt('switchCornerSize', $event.target.value)"
             placeholder="0">
           <span class="input-unit">px</span>
         </div>
       </div>
+      <div class="corner-row">
+        <button v-for="corner in corners" :key="corner.key"
+          class="corner-btn" :class="{ active: isCornerActive(corner.key) }"
+          @click="toggleCorner(corner.key)">{{ corner.short }}</button>
+      </div>
     </div>
 
-    <!-- Aliases -->
-    <div class="settings-section">
-      <div class="section-label">Aliases</div>
-      <p class="section-hint">Hostnames that map to this screen</p>
+    <!-- Aliases (compact) -->
+    <div class="settings-section compact">
+      <div class="section-label">Aliases <button class="link-btn" @click="addAlias" style="margin-left:6px;">+ add</button></div>
       <div v-for="(alias, ai) in (aliases[screen.name] || [])" :key="ai" class="alias-row">
-        <input class="input alias-input" :value="alias"
+        <input class="input input-sm alias-input" :value="alias"
           @input="updateAlias(ai, $event.target.value)"
           placeholder="hostname" spellcheck="false">
         <button class="alias-remove" @click="removeAlias(ai)">&times;</button>
       </div>
-      <button class="link-btn" @click="addAlias">+ add alias</button>
     </div>
 
-    <!-- Modifier Remapping -->
-    <div class="settings-section">
-      <div class="section-label">Modifier Keys</div>
-      <p class="section-hint">Remap modifiers for this screen</p>
-      <div class="input-group" v-for="mod in displayModifiers" :key="mod.key">
-        <label class="input-label">{{ mod.label }}</label>
-        <select class="input" :value="screen.options?.[mod.key] || ''" @change="setOpt(mod.key, $event.target.value)">
-          <option value="">default</option>
-          <option v-for="v in displayModValues" :key="v.value" :value="v.value">{{ v.label }}</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Toggles -->
-    <div class="settings-section">
+    <!-- Fixes (compact toggles) -->
+    <div class="settings-section compact">
       <div class="section-label">Fixes</div>
-      <div v-for="opt in toggleOpts" :key="opt.key" class="toggle-row">
+      <div v-for="opt in toggleOpts" :key="opt.key" class="toggle-row compact-toggle">
         <span class="toggle-label">{{ opt.label }}</span>
         <input type="checkbox" class="toggle"
           :checked="screen.options?.[opt.key] === 'true'"
@@ -218,10 +198,10 @@ function osLabel(os) {
 }
 
 const corners = [
-  { key: 'top-left', label: 'Top Left', pos: 'pos-tl' },
-  { key: 'top-right', label: 'Top Right', pos: 'pos-tr' },
-  { key: 'bottom-left', label: 'Bottom Left', pos: 'pos-bl' },
-  { key: 'bottom-right', label: 'Bottom Right', pos: 'pos-br' },
+  { key: 'top-left', label: 'Top Left', pos: 'pos-tl', short: 'TL' },
+  { key: 'top-right', label: 'Top Right', pos: 'pos-tr', short: 'TR' },
+  { key: 'bottom-left', label: 'Bottom Left', pos: 'pos-bl', short: 'BL' },
+  { key: 'bottom-right', label: 'Bottom Right', pos: 'pos-br', short: 'BR' },
 ]
 
 const toggleOpts = [
@@ -282,25 +262,21 @@ function updateAlias(index, value) {
 <style scoped>
 .screen-settings {
   border-top: 1px solid var(--border);
-  animation: slideIn 0.2s ease;
+  animation: slideIn 0.15s ease;
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .settings-header {
-  padding: 14px 18px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--accent-bg);
 }
 
-.settings-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+.settings-title-row { display: flex; align-items: center; gap: 8px; }
 
 .settings-title {
   font-family: var(--font-mono);
@@ -320,187 +296,135 @@ function updateAlias(index, value) {
   border-radius: 3px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  flex-shrink: 0;
 }
 
-.settings-subtitle {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin-top: 2px;
-  display: block;
-}
+.settings-subtitle { font-size: 10px; color: var(--text-muted); margin-top: 1px; display: block; }
 
-.settings-section {
-  padding: 14px 18px;
+/* Compact sections */
+.settings-section.compact {
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
 .section-label {
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-dim);
-  margin-bottom: 4px;
-}
-
-.section-hint {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-bottom: 10px;
-}
-
-/* OS detection */
-.os-detected {
+  margin-bottom: 6px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--bg-inset);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
-  font-size: 13px;
+}
+
+/* Inline row (label + control side by side) */
+.inline-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.os-inline {
+  font-size: 12px;
   color: var(--text);
 }
 
-.os-icon {
-  font-size: 16px;
+/* Small inputs */
+.input-sm {
+  padding: 5px 8px;
+  font-size: 11px;
 }
 
-.os-auto {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-muted);
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 11px;
 }
 
-/* Preset */
-.preset-box {
-  margin-top: 12px;
-  padding: 12px;
-  background: var(--bg-inset);
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius);
+/* Modifier grid — 2 columns */
+.mod-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 
-.preset-desc {
-  font-size: 12px;
-  color: var(--text-dim);
-  line-height: 1.5;
-}
-
-/* Corner visualization */
-.corner-viz {
+.mod-cell {
   display: flex;
-  justify-content: center;
-  padding: 8px 0;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.corner-screen {
-  position: relative;
-  width: 160px;
-  height: 100px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+.mod-label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* Corner buttons — inline row */
+.corner-row {
+  display: flex;
+  gap: 4px;
+}
+
+.corner-btn {
+  flex: 1;
+  padding: 5px 0;
   background: var(--bg-inset);
-}
-
-.corner-screen-label {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--text-muted);
-}
-
-.corner-dot {
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  border-radius: 3px;
-  border: 1px solid var(--border);
-  background: var(--bg-raised);
+  color: var(--text-dim);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s;
+  text-align: center;
 }
 
-.corner-dot:hover {
-  border-color: var(--accent-border);
-  background: var(--bg-hover);
+.corner-btn:hover {
+  border-color: var(--border);
+  color: var(--text);
 }
 
-.corner-dot.active {
+.corner-btn.active {
   background: var(--accent-bg);
   border-color: var(--accent);
-  box-shadow: 0 0 8px rgba(232, 168, 48, 0.2);
+  color: var(--accent);
 }
 
-.corner-dot.active::after {
-  content: '';
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  background: var(--accent);
-}
-
-.pos-tl { top: -4px; left: -4px; }
-.pos-tr { top: -4px; right: -4px; }
-.pos-bl { bottom: -4px; left: -4px; }
-.pos-br { bottom: -4px; right: -4px; }
-
+/* Input with unit */
 .input-with-unit {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.input-with-unit .input {
-  padding-right: 36px;
-}
+.input-with-unit .input { padding-right: 28px; }
 
 .input-unit {
   position: absolute;
-  right: 10px;
+  right: 8px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-muted);
   pointer-events: none;
 }
 
 /* Aliases */
-.alias-row {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 4px;
-}
-
-.alias-input {
-  flex: 1;
-  font-size: 11px;
-  padding: 6px 10px;
-}
+.alias-row { display: flex; gap: 4px; margin-bottom: 3px; }
+.alias-input { flex: 1; }
 
 .alias-remove {
   background: none;
   border: 1px solid transparent;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 15px;
-  padding: 0 6px;
+  font-size: 14px;
+  padding: 0 4px;
   border-radius: var(--radius-sm);
   transition: all 0.15s;
 }
 
-.alias-remove:hover {
-  color: var(--red);
-  background: var(--red-bg);
-}
+.alias-remove:hover { color: var(--red); background: var(--red-bg); }
 
 .link-btn {
   background: none;
@@ -509,11 +433,13 @@ function updateAlias(index, value) {
   font-family: var(--font-mono);
   font-size: 10px;
   cursor: pointer;
-  padding: 4px 0;
+  padding: 0;
   transition: color 0.15s;
 }
 
-.link-btn:hover {
-  color: var(--accent);
-}
+.link-btn:hover { color: var(--accent); }
+
+/* Compact toggles */
+.compact-toggle { padding: 4px 0; }
+.compact-toggle .toggle-label { font-size: 11px; }
 </style>

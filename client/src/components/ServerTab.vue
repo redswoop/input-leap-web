@@ -17,6 +17,50 @@
           </div>
         </section>
 
+        <!-- Process Options -->
+        <section class="card">
+          <h2 class="card-title">Process</h2>
+          <div class="option-grid">
+            <div class="input-group">
+              <label class="input-label">Listen address</label>
+              <input class="input" v-model="processOpts.address" placeholder=":24800">
+            </div>
+            <div class="input-group">
+              <label class="input-label">Debug level</label>
+              <select class="input" v-model="processOpts.debugLevel">
+                <option value="FATAL">Fatal</option>
+                <option value="ERROR">Error</option>
+                <option value="WARNING">Warning</option>
+                <option value="NOTE">Note</option>
+                <option value="INFO">Info (default)</option>
+                <option value="DEBUG">Debug</option>
+                <option value="DEBUG1">Debug1</option>
+                <option value="DEBUG2">Debug2</option>
+              </select>
+            </div>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Log file (optional)</label>
+            <input class="input" v-model="processOpts.logFile" placeholder="Leave empty to log to stdout">
+          </div>
+          <div class="toggle-list" style="margin-top:8px;">
+            <div class="toggle-row">
+              <div>
+                <span class="toggle-label">TLS / Crypto</span>
+                <span class="toggle-desc">Encrypt connections with SSL</span>
+              </div>
+              <input type="checkbox" class="toggle" v-model="processOpts.crypto">
+            </div>
+            <div class="toggle-row">
+              <div>
+                <span class="toggle-label">Drag &amp; drop</span>
+                <span class="toggle-desc">Enable file drag and drop between screens</span>
+              </div>
+              <input type="checkbox" class="toggle" v-model="processOpts.dragDrop">
+            </div>
+          </div>
+        </section>
+
         <!-- Switching -->
         <section class="card">
           <h2 class="card-title">Switching</h2>
@@ -94,6 +138,13 @@ import { useConfig } from '../composables/useConfig.js'
 
 const { options, serverName, configText, saveAll } = useConfig()
 const copied = ref(false)
+const processOpts = ref({
+  address: ':24800',
+  debugLevel: 'INFO',
+  logFile: '',
+  crypto: false,
+  dragDrop: false,
+})
 
 const featureToggles = [
   { key: 'screenSaverSync', label: 'Screensaver sync', desc: 'Sync screensaver state across screens' },
@@ -112,12 +163,23 @@ const highlightedLines = computed(() => {
   })
 })
 
+function serverBody() {
+  return {
+    name: serverName.value || undefined,
+    address: processOpts.value.address || undefined,
+    crypto: processOpts.value.crypto,
+    debugLevel: processOpts.value.debugLevel || 'INFO',
+    logFile: processOpts.value.logFile || undefined,
+    dragDrop: processOpts.value.dragDrop,
+  }
+}
+
 async function start() {
   await saveAll()
   await fetch('/api/server/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: serverName.value || undefined }),
+    body: JSON.stringify(serverBody()),
   })
 }
 
@@ -130,7 +192,7 @@ async function restart() {
   await fetch('/api/server/restart', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: serverName.value || undefined }),
+    body: JSON.stringify(serverBody()),
   })
 }
 

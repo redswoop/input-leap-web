@@ -71,6 +71,20 @@ app.get('/api/status', (req, res) => {
   res.json(serverProc.getStatus());
 });
 
+// Proxy to InputLeap's status endpoint (port 24801)
+app.get('/api/il-status', async (req, res) => {
+  try {
+    const resp = await fetch('http://localhost:24801');
+    if (resp.ok) {
+      res.json(await resp.json());
+    } else {
+      res.json(null);
+    }
+  } catch {
+    res.json(null);
+  }
+});
+
 app.post('/api/server/start', (req, res) => {
   const { name, address, crypto } = req.body || {};
   serverProc.start(CONFIG_PATH, { name, address, crypto });

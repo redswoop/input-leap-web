@@ -9,12 +9,25 @@
           v-for="(s, i) in screens"
           :key="s.name"
           class="screen-item"
-          :class="{ selected: selected === i }"
+          :class="{ selected: selected === i, disconnected: !isConnected(s.name), hidden: s.visible === false }"
           @click="$emit('select', selected === i ? -1 : i)"
         >
-          <span class="color-pip" :style="{ background: colors[i % colors.length] }" />
+          <input
+            type="checkbox"
+            class="vis-toggle"
+            :checked="s.visible !== false"
+            @click.stop
+            @change="toggleVisible(s)"
+            :title="s.visible !== false ? 'Hide from topology' : 'Show in topology'"
+          >
+          <span class="os-icon">{{ osIcon(s) }}</span>
           <span class="name">{{ s.name }}</span>
           <span v-if="s.name === serverName" class="server-tag">server</span>
+          <span v-if="isConnected(s.name)" class="conn-dot connected" title="Connected"></span>
+          <span v-else class="conn-dot" title="Disconnected"></span>
+          <span v-if="isConnected(s.name) && connectedClients[s.name]" class="res-label">
+            {{ connectedClients[s.name].width }}×{{ connectedClients[s.name].height }}
+          </span>
           <button v-if="s.name !== serverName" class="delete-btn" @click.stop="$emit('remove', i)" title="Remove">&times;</button>
         </li>
       </ul>
@@ -30,10 +43,25 @@ const props = defineProps({
   selected: { type: Number, default: -1 }
 })
 
-const { screens, serverName } = useConfig()
-const colors = ['#4a9eff', '#ff6b6b', '#51cf66', '#ffd43b', '#cc5de8', '#ff922b']
+const { screens, serverName, serverPlatform, connectedClients } = useConfig()
 
 const emit = defineEmits(['remove', 'add', 'select'])
+
+function isConnected(name) {
+  return name in connectedClients.value
+}
+
+function osIcon(screen) {
+  const os = screen.name === serverName.value ? serverPlatform.value : screen.os
+  if (os === 'macos') return '🍎'
+  if (os === 'windows') return '🪟'
+  if (os === 'linux') return '🐧'
+  return '💻'
+}
+
+function toggleVisible(screen) {
+  screen.visible = screen.visible === false ? true : false
+}
 
 function addScreen() {
   const name = prompt('Screen name:')
@@ -44,11 +72,55 @@ function addScreen() {
 <style scoped>
 .screen-item {
   cursor: pointer;
+  gap: 6px;
 }
 
 .screen-item.selected {
   border-color: var(--accent-border) !important;
   background: var(--accent-bg) !important;
+}
+
+.screen-item.disconnected .name {
+  opacity: 0.5;
+}
+
+.screen-item.hidden {
+  opacity: 0.4;
+}
+
+.vis-toggle {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.os-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.conn-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.conn-dot.connected {
+  background: var(--green);
+  box-shadow: 0 0 6px #66bb6a40;
+}
+
+.res-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .server-tag {
@@ -60,9 +132,8 @@ function addScreen() {
   border: 1px solid var(--accent-border);
   padding: 1px 5px;
   border-radius: 3px;
-  margin-left: 4px;
-  flex-shrink: 0;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  flex-shrink: 0;
 }
 </style>

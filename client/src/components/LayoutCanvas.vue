@@ -17,7 +17,7 @@ const COLORS = ['#4a9eff', '#ff6b6b', '#51cf66', '#ffd43b', '#cc5de8', '#ff922b'
 
 const container = ref(null)
 const canvas = ref(null)
-const { screens, links, serverName, debouncedSaveLayout } = useConfig()
+const { screens, links, serverName, connectedClients, debouncedSaveLayout } = useConfig()
 
 let ctx = null
 let dragging = null
@@ -82,6 +82,21 @@ onUnmounted(() => {
 
 watch(screens, () => draw(), { deep: true })
 
+// When clients connect, fix aspect ratio to match real resolution (once per screen)
+let aspectApplied = new Set()
+watch(connectedClients, (clients) => {
+  for (const s of screens.value) {
+    const info = clients[s.name]
+    if (info && !aspectApplied.has(s.name) && info.width > 0) {
+      aspectApplied.add(s.name)
+      const realAspect = info.width / info.height
+      s.h = Math.round(s.w / realAspect)
+      updateLinks()
+    }
+  }
+  draw()
+}, { deep: true })
+
 const emit = defineEmits(['select'])
 
 defineExpose({ addScreen, removeScreen })
@@ -104,7 +119,7 @@ function removeScreen(index) {
 }
 
 function updateLinks() {
-  links.value = detectEdges(screens.value)
+  links.value = detectEdges(screens.value.filter(s => s.visible !== false))
   draw()
 }
 
@@ -129,8 +144,11 @@ function draw() {
   drawLinks()
 
   screens.value.forEach((s, i) => {
+    if (s.visible === false) return
+
     const color = COLORS[i % COLORS.length]
     const isSel = i === selected
+    const isConn = s.name in connectedClients.value
 
     // Glow for selected
     if (isSel) {
@@ -143,17 +161,24 @@ function draw() {
       ctx.shadowOffsetY = 3
     }
 
-    // Fill with subtle gradient
+    // Fill with subtle gradient — dimmed if disconnected
+    const alpha = isConn ? 1 : 0.35
+    ctx.globalAlpha = alpha
+
     const grad = ctx.createLinearGradient(s.x, s.y, s.x, s.y + s.h)
     grad.addColorStop(0, color + '18')
     grad.addColorStop(1, color + '08')
     ctx.fillStyle = grad
     ctx.strokeStyle = isSel ? color + 'cc' : color + '55'
     ctx.lineWidth = isSel ? 2 : 1
+    if (!isConn) {
+      ctx.setLineDash([4, 4])
+    }
     ctx.beginPath()
     ctx.roundRect(s.x, s.y, s.w, s.h, 6)
     ctx.fill()
     ctx.stroke()
+    ctx.setLineDash([])
 
     // Inner border for depth
     ctx.shadowColor = 'transparent'
@@ -197,10 +222,12 @@ function draw() {
 
     ctx.fillText(displayLabel, s.x + s.w / 2, s.y + s.h / 2)
 
-    // Dimensions
+    // Dimensions — show real resolution if connected, otherwise canvas size
     ctx.fillStyle = '#666'
     ctx.font = '10px JetBrains Mono, monospace'
-    ctx.fillText(`${s.w} × ${s.h}`, s.x + s.w / 2, s.y + s.h / 2 + 16)
+    const cInfo = connectedClients.value[s.name]
+    const dimLabel = cInfo ? `${cInfo.width}×${cInfo.height}` : `${s.w} × ${s.h}`
+    ctx.fillText(dimLabel, s.x + s.w / 2, s.y + s.h / 2 + 16)
 
     // Resize handle
     if (isSel) {
@@ -209,6 +236,8 @@ function draw() {
       ctx.roundRect(s.x + s.w - HANDLE_SIZE - 1, s.y + s.h - HANDLE_SIZE - 1, HANDLE_SIZE + 1, HANDLE_SIZE + 1, 2)
       ctx.fill()
     }
+
+    ctx.globalAlpha = 1
 
     // Server border accent — drawn inside the screen
     if (isServer) {
