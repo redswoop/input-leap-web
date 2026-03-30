@@ -23,9 +23,11 @@
           <span class="os-icon">{{ osIcon(s) }}</span>
           <span class="name">{{ s.name }}</span>
           <span v-if="s.name === serverName" class="server-tag">server</span>
-          <span v-if="isConnected(s.name)" class="conn-dot connected" title="Connected"></span>
-          <span v-else class="conn-dot" title="Disconnected"></span>
-          <span v-if="isConnected(s.name) && connectedClients[s.name]" class="res-label">
+          <template v-if="s.name !== serverName">
+            <span v-if="isConnected(s.name)" class="conn-dot connected" title="Connected"></span>
+            <span v-else class="conn-dot" title="Disconnected"></span>
+          </template>
+          <span v-if="connectedClients[s.name]" class="res-label">
             {{ connectedClients[s.name].width }}×{{ connectedClients[s.name].height }}
           </span>
           <button v-if="s.name !== serverName" class="delete-btn" @click.stop="$emit('remove', i)" title="Remove">&times;</button>

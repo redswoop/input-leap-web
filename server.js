@@ -29,8 +29,47 @@ function broadcast(type, data) {
   }
 }
 
-serverProc.on('log', (line) => broadcast('log', line));
-serverProc.on('status', (status) => broadcast('status', status));
+serverProc.on('log', (line) => {
+  broadcast('log', line);
+  // Parse structured events from log lines
+  const event = parseLogEvent(line);
+  if (event) broadcast('event', event);
+});
+serverProc.on('status', (status) => {
+  broadcast('status', status);
+  if (status.running) {
+    broadcast('event', { kind: 'server-started', time: Date.now() });
+  } else {
+    broadcast('event', { kind: 'server-stopped', time: Date.now() });
+  }
+});
+
+function parseLogEvent(line) {
+  const time = Date.now();
+  let m;
+
+  // client "name" has connected
+  m = line.match(/client "([^"]+)" has connected/);
+  if (m) return { kind: 'client-connected', name: m[1], time };
+
+  // disconnecting client "name"
+  m = line.match(/disconnecting client "([^"]+)"/);
+  if (m) return { kind: 'client-disconnected', name: m[1], time };
+
+  // forced disconnection of client "name"
+  m = line.match(/forced disconnection of client "([^"]+)"/);
+  if (m) return { kind: 'client-disconnected', name: m[1], time };
+
+  // switch from "x" to "y" at n,n
+  m = line.match(/switch from "([^"]+)" to "([^"]+)" at (\d+),(\d+)/);
+  if (m) return { kind: 'screen-switched', from: m[1], to: m[2], x: +m[3], y: +m[4], time };
+
+  // unrecognised client
+  m = line.match(/unrecognised client name "([^"]+)"/);
+  if (m) return { kind: 'client-rejected', name: m[1], time };
+
+  return null;
+}
 
 // API routes
 app.get('/api/config', (req, res) => {

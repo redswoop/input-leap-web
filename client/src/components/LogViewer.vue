@@ -2,10 +2,10 @@
   <div class="log-panel" :class="collapsed ? 'collapsed' : 'expanded'">
     <div class="log-header" @click="collapsed = !collapsed">
       <div class="log-header-left">
-        <span class="panel-label">Logs</span>
+        <span class="log-title">Logs</span>
         <span class="log-count" v-if="logs.length">{{ logs.length }}</span>
       </div>
-      <span class="toggle-arrow" :class="{ flipped: collapsed }">&#9662;</span>
+      <span class="toggle-arrow" :class="{ flipped: collapsed }">{{ collapsed ? '▲ Show' : '▼ Hide' }}</span>
     </div>
     <div class="log-content" ref="logEl">
       <div v-for="(line, i) in logs" :key="i" class="log-line" :class="logClass(line)">
@@ -46,16 +46,16 @@ function logClass(line) {
   overflow: hidden;
 }
 
-.log-panel.collapsed { height: 36px !important; }
-.log-panel.expanded { height: 150px; max-height: 150px; }
+.log-panel.collapsed { height: 44px !important; }
+.log-panel.expanded { height: 180px; max-height: 180px; }
 
 .log-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 18px;
-  height: 36px;
-  min-height: 36px;
+  padding: 0 20px;
+  height: 44px;
+  min-height: 44px;
   cursor: pointer;
   user-select: none;
   transition: background 0.15s;
@@ -66,27 +66,35 @@ function logClass(line) {
 .log-header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+.log-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .log-count {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   background: var(--bg-inset);
-  padding: 1px 6px;
+  padding: 2px 8px;
   border-radius: 3px;
   border: 1px solid var(--border-subtle);
 }
 
 .toggle-arrow {
-  font-size: 10px;
-  color: var(--text-muted);
-  transition: transform 0.25s ease;
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--text-dim);
+  transition: color 0.15s;
 }
 
-.toggle-arrow.flipped {
-  transform: rotate(-90deg);
+.toggle-arrow:hover {
+  color: var(--text);
 }
 
 .log-content {

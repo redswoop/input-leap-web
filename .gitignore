@@ -5,3 +5,4 @@ public/assets/
 *.log
 .DS_Store
 input-leap.conf
+layout.json

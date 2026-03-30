@@ -62,18 +62,9 @@ onMounted(() => {
   // Wait for hostname to load, then ensure server screen exists
   watch(serverName, () => ensureServerScreen(), { immediate: true })
 
-  // Default layout if empty and no server name yet
-  if (screens.value.length === 0 && !serverName.value) {
-    const rect = container.value.getBoundingClientRect()
-    const cx = Math.round(rect.width / 2)
-    const topY = Math.round(rect.height / 2 - 160)
-    screens.value.push(
-      { name: 'server', x: cx - 280, y: topY, w: 560, h: 160, options: {} },
-      { name: 'laptop-left', x: cx - 280, y: topY + 160, w: 280, h: 175, options: {} },
-      { name: 'laptop-right', x: cx, y: topY + 160, w: 280, h: 175, options: {} },
-    )
-    updateLinks()
-  }
+  // Don't create default screens — wait for hostname to load,
+  // then ensureServerScreen will create the server screen.
+  // User adds client screens manually.
 })
 
 onUnmounted(() => {

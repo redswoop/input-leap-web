@@ -48,26 +48,47 @@
       </div>
     </div>
 
+    <!-- Status Tab -->
+    <div v-show="activeTab === 'status'" class="tab-view server-view">
+      <StatusTab />
+    </div>
+
     <!-- Logs -->
     <LogViewer />
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useWebSocket } from './composables/useWebSocket.js'
 import { useConfig } from './composables/useConfig.js'
 import LayoutCanvas from './components/LayoutCanvas.vue'
 import ScreenList from './components/ScreenList.vue'
 import ScreenSettings from './components/ScreenSettings.vue'
 import ServerTab from './components/ServerTab.vue'
+import StatusTab from './components/StatusTab.vue'
 import LogViewer from './components/LogViewer.vue'
 
 const { serverStatus } = useWebSocket()
 const { screens } = useConfig()
 const layoutCanvas = ref(null)
-const selectedScreen = ref(-1)
-const activeTab = ref('topology')
+
+// Read initial state from URL
+const params = new URLSearchParams(window.location.search)
+const selectedScreen = ref(parseInt(params.get('screen') ?? '-1'))
+const activeTab = ref(params.get('tab') || 'topology')
+
+// Sync state to URL without reloading
+function updateURL() {
+  const p = new URLSearchParams()
+  p.set('tab', activeTab.value)
+  if (selectedScreen.value >= 0) p.set('screen', selectedScreen.value)
+  const url = `${window.location.pathname}?${p.toString()}`
+  window.history.replaceState(null, '', url)
+}
+
+watch(activeTab, updateURL)
+watch(selectedScreen, updateURL)
 
 const selectedScreenObj = computed(() => {
   if (selectedScreen.value >= 0 && selectedScreen.value < screens.value.length) {
@@ -79,6 +100,7 @@ const selectedScreenObj = computed(() => {
 const tabs = [
   { id: 'topology', label: 'Topology' },
   { id: 'server', label: 'Server' },
+  { id: 'status', label: 'Status' },
 ]
 </script>
 

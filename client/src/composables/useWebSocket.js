@@ -1,7 +1,8 @@
 import { ref } from 'vue'
 
 const logs = ref([])
-const serverStatus = ref({ running: false, pid: null })
+const serverStatus = ref({ running: false, pid: null, startedAt: null })
+const events = ref([]) // parsed structured events
 let ws = null
 
 function connect() {
@@ -15,6 +16,9 @@ function connect() {
       if (logs.value.length > 500) logs.value.splice(0, logs.value.length - 500)
     } else if (msg.type === 'status') {
       serverStatus.value = msg.data
+    } else if (msg.type === 'event') {
+      events.value.unshift(msg.data) // newest first
+      if (events.value.length > 200) events.value.length = 200
     }
   })
 
@@ -28,5 +32,5 @@ function connect() {
 
 export function useWebSocket() {
   if (!ws) connect()
-  return { logs, serverStatus }
+  return { logs, serverStatus, events }
 }
