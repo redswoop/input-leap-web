@@ -50,7 +50,7 @@ Browser ←─ HTTP/WS ─→ Express+WS server (:24802) ←─ spawns ─→ in
 
 **Key data flow:** Canvas drag → `useConfig.screens` updated → `edge-detection.detectEdges()` recomputes links → `useConfig.configText` (computed) regenerates the config file text → save sends both config + layout to backend → backend auto-reloads the running server.
 
-**InputLeap fork** (`../input-leap-fork`): A fork of input-leap at `redswoop/input-leap` with a custom `StatusListener` that exposes a JSON endpoint on port 24801. Reports connected clients, their screen resolution (`getShape()`), cursor position, and active screen. The server itself appears as client 0. The web UI polls this via `/api/il-status`.
+**InputLeap fork** (`../input-leap-fork`): A fork of input-leap at `redswoop/input-leap` with a custom `StatusListener` that exposes a JSON endpoint on port 24803. Reports connected clients, their screen resolution (`getShape()`), cursor position, and active screen. The server itself appears as client 0. The web UI polls this via `/api/il-status`.
 
 ## Config Format Notes
 

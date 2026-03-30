@@ -111,10 +111,10 @@ app.get('/api/status', (req, res) => {
   res.json(serverProc.getStatus());
 });
 
-// Proxy to InputLeap's status endpoint (port 24801)
+// Proxy to InputLeap's status endpoint (port 24803)
 app.get('/api/il-status', async (req, res) => {
   try {
-    const resp = await fetch('http://localhost:24801');
+    const resp = await fetch('http://localhost:24803');
     if (resp.ok) {
       res.json(await resp.json());
     } else {

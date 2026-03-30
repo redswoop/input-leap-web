@@ -23,6 +23,14 @@
       <button v-if="presetAvailable" class="btn btn-accent btn-sm" style="width:100%;margin-top:6px;" @click="applyPreset">
         Apply recommended key mapping
       </button>
+      <div class="inline-row" style="margin-top:8px;">
+        <span class="section-label" style="margin-bottom:0">Display Scale</span>
+        <div class="scale-row">
+          <button v-for="s in scalePresets" :key="s"
+            class="scale-btn" :class="{ active: (screen.scaleFactor || 1) === s }"
+            @click="screen.scaleFactor = s">{{ s }}x</button>
+        </div>
+      </div>
     </div>
 
     <!-- Modifier Keys (compact 2-col grid) -->
@@ -92,7 +100,9 @@ const props = defineProps({
 
 const { aliases, serverName, serverPlatform, saveAll } = useConfig()
 
-// Auto-save when screen options, OS, or aliases change
+const scalePresets = [1, 1.25, 1.5, 2, 3]
+
+// Auto-save when screen options, OS, scaleFactor, or aliases change
 let saveTimer = null
 function debouncedSave() {
   clearTimeout(saveTimer)
@@ -100,6 +110,7 @@ function debouncedSave() {
 }
 watch(() => props.screen.options, debouncedSave, { deep: true })
 watch(() => props.screen.os, debouncedSave)
+watch(() => props.screen.scaleFactor, debouncedSave)
 watch(() => aliases.value[props.screen.name], debouncedSave, { deep: true })
 
 const isServer = computed(() => props.screen.name === serverName.value)
@@ -448,6 +459,26 @@ function updateAlias(index, value) {
 }
 
 .link-btn:hover { color: var(--accent); }
+
+/* Scale presets */
+.scale-row { display: flex; gap: 3px; flex: 1; }
+
+.scale-btn {
+  flex: 1;
+  padding: 4px 0;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.scale-btn:hover { border-color: var(--border); color: var(--text); }
+.scale-btn.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
 
 /* Compact toggles */
 .compact-toggle { padding: 4px 0; }

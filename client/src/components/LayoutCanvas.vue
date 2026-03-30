@@ -17,7 +17,7 @@ const COLORS = ['#4a9eff', '#ff6b6b', '#51cf66', '#ffd43b', '#cc5de8', '#ff922b'
 
 const container = ref(null)
 const canvas = ref(null)
-const { screens, links, serverName, connectedClients, debouncedSaveLayout } = useConfig()
+const { screens, links, serverName, connectedClients, debouncedSaveLayout, saveAll } = useConfig()
 
 let ctx = null
 let dragging = null
@@ -62,9 +62,8 @@ onMounted(() => {
   // Wait for hostname to load, then ensure server screen exists
   watch(serverName, () => ensureServerScreen(), { immediate: true })
 
-  // Don't create default screens — wait for hostname to load,
-  // then ensureServerScreen will create the server screen.
-  // User adds client screens manually.
+  // Apply resolution data if already available
+  resizeToResolution()
 })
 
 onUnmounted(() => {
@@ -73,27 +72,27 @@ onUnmounted(() => {
 
 watch(screens, () => draw(), { deep: true })
 
-// When clients connect, resize screens to match real resolution proportionally
-const BASE_SCALE = 0.08 // pixels-per-real-pixel for canvas sizing
-let lastResolutions = {}
-watch(connectedClients, (clients) => {
-  // Collect all known resolutions
+// Resize screens to match real resolution proportionally, accounting for scale factors
+const BASE_SCALE = 0.08
+let lastResolutionKey = ''
+
+function resizeToResolution() {
+  const clients = connectedClients.value
   const known = {}
   for (const s of screens.value) {
     const info = clients[s.name]
     if (info && info.width > 0) {
-      known[s.name] = { w: info.width, h: info.height }
+      const sf = s.scaleFactor || 1
+      known[s.name] = { w: info.width / sf, h: info.height / sf }
     }
   }
 
-  // Only re-layout if we got new resolution info
   const knownKey = JSON.stringify(known)
-  if (knownKey === JSON.stringify(lastResolutions)) { draw(); return }
-  lastResolutions = known
+  if (knownKey === lastResolutionKey) { draw(); return }
+  lastResolutionKey = knownKey
 
   if (Object.keys(known).length === 0) { draw(); return }
 
-  // Find the largest screen to anchor scale — fit it to a reasonable canvas size
   let maxW = 0
   for (const r of Object.values(known)) {
     if (r.w > maxW) maxW = r.w
@@ -107,7 +106,6 @@ watch(connectedClients, (clients) => {
     if (r) {
       const newW = Math.round(r.w * scale)
       const newH = Math.round(r.h * scale)
-      // Preserve center position
       const cx = s.x + s.w / 2
       const cy = s.y + s.h / 2
       s.w = Math.max(60, newW)
@@ -119,6 +117,19 @@ watch(connectedClients, (clients) => {
 
   updateLinks()
   debouncedSaveLayout()
+}
+
+watch(connectedClients, resizeToResolution, { deep: true })
+
+// Re-layout when scaleFactor changes on any screen
+let lastScaleKey = ''
+watch(screens, () => {
+  const scaleKey = screens.value.map(s => `${s.name}:${s.scaleFactor || 1}`).join(',')
+  if (scaleKey !== lastScaleKey) {
+    lastScaleKey = scaleKey
+    lastResolutionKey = '' // force re-layout
+    resizeToResolution()
+  }
 }, { deep: true })
 
 const emit = defineEmits(['select'])
@@ -439,10 +450,14 @@ function onMouseMove(e) {
   }
 }
 
+let saveTimer = null
 function onMouseUp() {
   if (dragging || resizing) {
     updateLinks()
     debouncedSaveLayout()
+    // Debounced full save so server reloads with new links
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => saveAll(), 1200)
   }
   dragging = null
   resizing = null

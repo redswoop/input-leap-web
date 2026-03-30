@@ -104,6 +104,7 @@ async function saveLayout() {
         name: s.name, x: s.x, y: s.y, w: s.w, h: s.h,
         os: s.os || null, options: s.options || {},
         visible: s.visible !== false,
+        scaleFactor: s.scaleFactor || 1,
       })),
     }),
   })
@@ -145,6 +146,7 @@ async function init() {
         name: s.name, x: s.x, y: s.y, w: s.w, h: s.h,
         os: s.os || null, options: s.options || {},
         visible: s.visible !== false,
+        scaleFactor: s.scaleFactor || 1,
       }))
     }
   } catch { /* ignore */ }

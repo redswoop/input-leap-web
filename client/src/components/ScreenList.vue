@@ -20,17 +20,21 @@
             @change="toggleVisible(s)"
             :title="s.visible !== false ? 'Hide from topology' : 'Show in topology'"
           >
-          <span class="os-icon">{{ osIcon(s) }}</span>
-          <span class="name">{{ s.name }}</span>
-          <span v-if="s.name === serverName" class="server-tag">server</span>
-          <template v-if="s.name !== serverName">
-            <span v-if="isConnected(s.name)" class="conn-dot connected" title="Connected"></span>
-            <span v-else class="conn-dot" title="Disconnected"></span>
-          </template>
-          <span v-if="connectedClients[s.name]" class="res-label">
-            {{ connectedClients[s.name].width }}×{{ connectedClients[s.name].height }}
-          </span>
-          <button v-if="s.name !== serverName" class="delete-btn" @click.stop="$emit('remove', i)" title="Remove">&times;</button>
+          <div class="screen-info">
+            <div class="screen-row-top">
+              <span class="os-icon">{{ osIcon(s) }}</span>
+              <span class="name">{{ s.name }}</span>
+              <span v-if="s.name === serverName" class="server-tag">server</span>
+              <template v-if="s.name !== serverName">
+                <span v-if="isConnected(s.name)" class="conn-dot connected" title="Connected"></span>
+                <span v-else class="conn-dot" title="Disconnected"></span>
+              </template>
+              <button v-if="s.name !== serverName" class="delete-btn" @click.stop="$emit('remove', i)" title="Remove">&times;</button>
+            </div>
+            <div v-if="connectedClients[s.name]" class="screen-row-bottom">
+              <span class="res-label">{{ connectedClients[s.name].width }}×{{ connectedClients[s.name].height }}</span>
+            </div>
+          </div>
         </li>
       </ul>
       <button class="btn btn-accent btn-full" @click="addScreen">+ Add Screen</button>
@@ -75,6 +79,25 @@ function addScreen() {
 .screen-item {
   cursor: pointer;
   gap: 6px;
+  flex-wrap: wrap;
+}
+
+.screen-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.screen-row-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.screen-row-bottom {
+  padding-left: 20px;
 }
 
 .screen-item.selected {
@@ -120,8 +143,8 @@ function addScreen() {
 
 .res-label {
   font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text-muted);
+  font-size: 10px;
+  color: var(--text-dim);
   flex-shrink: 0;
 }
 
