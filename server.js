@@ -80,7 +80,8 @@ app.get('/api/config', (req, res) => {
 
 app.post('/api/config', (req, res) => {
   config.save(CONFIG_PATH, req.body);
-  res.json({ ok: true });
+  const reloaded = serverProc.reload(CONFIG_PATH);
+  res.json({ ok: true, reloaded: reloaded || false });
 });
 
 app.get('/api/hostname', (req, res) => {

@@ -83,14 +83,24 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useConfig } from '../composables/useConfig.js'
 
 const props = defineProps({
   screen: { type: Object, required: true }
 })
 
-const { aliases, serverName, serverPlatform } = useConfig()
+const { aliases, serverName, serverPlatform, saveAll } = useConfig()
+
+// Auto-save when screen options, OS, or aliases change
+let saveTimer = null
+function debouncedSave() {
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => saveAll(), 800)
+}
+watch(() => props.screen.options, debouncedSave, { deep: true })
+watch(() => props.screen.os, debouncedSave)
+watch(() => aliases.value[props.screen.name], debouncedSave, { deep: true })
 
 const isServer = computed(() => props.screen.name === serverName.value)
 

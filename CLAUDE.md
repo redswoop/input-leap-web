@@ -35,20 +35,22 @@ Browser ←─ HTTP/WS ─→ Express+WS server (:24802) ←─ spawns ─→ in
 
 **Backend** (`server.js`, `lib/`): Express + WS. CommonJS (`"type": "commonjs"`).
 - `lib/config.js` — parser and generator for InputLeap's config file format. Handles range-based edge syntax like `down(0,50) = laptop`.
-- `lib/process.js` — manages spawning/stopping the `input-leaps` binary. Emits `log` and `status` events. Auto-discovers the binary across platforms.
-- `server.js` — REST API (`/api/config`, `/api/layout`, `/api/hostname`, `/api/status`, `/api/server/*`) + WebSocket (`/ws`) for live log/event streaming. Parses log lines into structured events (client connect/disconnect, screen switch).
+- `lib/process.js` — manages spawning/stopping the `input-leaps` binary. Emits `log` and `status` events. Auto-discovers the binary across platforms. Has `reload(configPath)` that sends SIGHUP on Unix (zero-downtime) or schedules a restart on Windows.
+- `server.js` — REST API (`/api/config`, `/api/layout`, `/api/hostname`, `/api/status`, `/api/server/*`) + WebSocket (`/ws`) for live log/event streaming. Parses log lines into structured events (client connect/disconnect, screen switch). `POST /api/config` auto-reloads the running server after saving.
 
 **Frontend** (`client/`): Vue 3 SPA + Vite. ES modules.
 - `composables/useConfig.js` — singleton reactive store. Holds all app state (screens, links, aliases, options). Generates config text, handles save/load, polls InputLeap status. Shared across all components via the composable pattern (module-level refs, not per-instance).
 - `composables/useWebSocket.js` — singleton WebSocket connection with auto-reconnect. Provides reactive `logs`, `serverStatus`, and `events` refs.
 - `lib/edge-detection.js` — computes adjacency links from screen canvas positions. Uses a snap threshold (14px) to detect shared edges and generates range-based link objects with percentage intervals.
-- `components/LayoutCanvas.vue` — HTML5 Canvas topology editor with drag-and-drop, resize handles, snap-to-edge.
-- `components/ScreenSettings.vue` — per-screen config (modifier keys, aliases, OS-specific presets).
+- `components/LayoutCanvas.vue` — HTML5 Canvas topology editor with drag-and-drop, resize handles, snap-to-edge. Scales screen boxes to real resolution aspect ratios and relative proportions when connected clients report their dimensions.
+- `components/ScreenSettings.vue` — per-screen config (modifier keys, aliases, OS-specific presets). Auto-saves on change with 800ms debounce.
 - `components/ServerTab.vue` — server start/stop/restart controls, process options.
 - `components/StatusTab.vue` — live connection status and parsed events.
 - `components/LogViewer.vue` — collapsible live log panel at bottom of app.
 
-**Key data flow:** Canvas drag → `useConfig.screens` updated → `edge-detection.detectEdges()` recomputes links → `useConfig.configText` (computed) regenerates the config file text → save sends both config + layout to backend.
+**Key data flow:** Canvas drag → `useConfig.screens` updated → `edge-detection.detectEdges()` recomputes links → `useConfig.configText` (computed) regenerates the config file text → save sends both config + layout to backend → backend auto-reloads the running server.
+
+**InputLeap fork** (`../input-leap-fork`): A fork of input-leap at `redswoop/input-leap` with a custom `StatusListener` that exposes a JSON endpoint on port 24801. Reports connected clients, their screen resolution (`getShape()`), cursor position, and active screen. The server itself appears as client 0. The web UI polls this via `/api/il-status`.
 
 ## Config Format Notes
 

@@ -73,19 +73,52 @@ onUnmounted(() => {
 
 watch(screens, () => draw(), { deep: true })
 
-// When clients connect, fix aspect ratio to match real resolution (once per screen)
-let aspectApplied = new Set()
+// When clients connect, resize screens to match real resolution proportionally
+const BASE_SCALE = 0.08 // pixels-per-real-pixel for canvas sizing
+let lastResolutions = {}
 watch(connectedClients, (clients) => {
+  // Collect all known resolutions
+  const known = {}
   for (const s of screens.value) {
     const info = clients[s.name]
-    if (info && !aspectApplied.has(s.name) && info.width > 0) {
-      aspectApplied.add(s.name)
-      const realAspect = info.width / info.height
-      s.h = Math.round(s.w / realAspect)
-      updateLinks()
+    if (info && info.width > 0) {
+      known[s.name] = { w: info.width, h: info.height }
     }
   }
-  draw()
+
+  // Only re-layout if we got new resolution info
+  const knownKey = JSON.stringify(known)
+  if (knownKey === JSON.stringify(lastResolutions)) { draw(); return }
+  lastResolutions = known
+
+  if (Object.keys(known).length === 0) { draw(); return }
+
+  // Find the largest screen to anchor scale — fit it to a reasonable canvas size
+  let maxW = 0
+  for (const r of Object.values(known)) {
+    if (r.w > maxW) maxW = r.w
+  }
+  const rect = container.value?.getBoundingClientRect()
+  const canvasW = rect ? rect.width : 800
+  const scale = Math.min(BASE_SCALE, (canvasW * 0.6) / maxW)
+
+  for (const s of screens.value) {
+    const r = known[s.name]
+    if (r) {
+      const newW = Math.round(r.w * scale)
+      const newH = Math.round(r.h * scale)
+      // Preserve center position
+      const cx = s.x + s.w / 2
+      const cy = s.y + s.h / 2
+      s.w = Math.max(60, newW)
+      s.h = Math.max(40, newH)
+      s.x = snap(cx - s.w / 2)
+      s.y = snap(cy - s.h / 2)
+    }
+  }
+
+  updateLinks()
+  debouncedSaveLayout()
 }, { deep: true })
 
 const emit = defineEmits(['select'])
@@ -125,7 +158,7 @@ function draw() {
   ctx.clearRect(0, 0, w, h)
 
   // Grid dots — warm amber tint
-  ctx.fillStyle = '#2a2520'
+  ctx.fillStyle = '#3d3530'
   for (let x = 0; x < w; x += GRID_SIZE * 8) {
     for (let y = 0; y < h; y += GRID_SIZE * 8) {
       ctx.fillRect(x, y, 1, 1)
@@ -153,14 +186,14 @@ function draw() {
     }
 
     // Fill with subtle gradient — dimmed if disconnected
-    const alpha = isConn ? 1 : 0.35
+    const alpha = isConn ? 1 : 0.6
     ctx.globalAlpha = alpha
 
     const grad = ctx.createLinearGradient(s.x, s.y, s.x, s.y + s.h)
-    grad.addColorStop(0, color + '18')
-    grad.addColorStop(1, color + '08')
+    grad.addColorStop(0, color + '35')
+    grad.addColorStop(1, color + '18')
     ctx.fillStyle = grad
-    ctx.strokeStyle = isSel ? color + 'cc' : color + '55'
+    ctx.strokeStyle = isSel ? color + 'dd' : color + '88'
     ctx.lineWidth = isSel ? 2 : 1
     if (!isConn) {
       ctx.setLineDash([4, 4])
@@ -175,7 +208,7 @@ function draw() {
     ctx.shadowColor = 'transparent'
     ctx.shadowBlur = 0
     ctx.shadowOffsetY = 0
-    ctx.strokeStyle = color + '0a'
+    ctx.strokeStyle = color + '20'
     ctx.lineWidth = 1
     ctx.beginPath()
     ctx.roundRect(s.x + 1, s.y + 1, s.w - 2, s.h - 2, 5)
@@ -213,12 +246,13 @@ function draw() {
 
     ctx.fillText(displayLabel, s.x + s.w / 2, s.y + s.h / 2)
 
-    // Dimensions — show real resolution if connected, otherwise canvas size
-    ctx.fillStyle = '#666'
-    ctx.font = '10px JetBrains Mono, monospace'
+    // Dimensions — only show real resolution when known
     const cInfo = connectedClients.value[s.name]
-    const dimLabel = cInfo ? `${cInfo.width}×${cInfo.height}` : `${s.w} × ${s.h}`
-    ctx.fillText(dimLabel, s.x + s.w / 2, s.y + s.h / 2 + 16)
+    if (cInfo && cInfo.width > 0) {
+      ctx.fillStyle = '#999'
+      ctx.font = '10px JetBrains Mono, monospace'
+      ctx.fillText(`${cInfo.width}×${cInfo.height}`, s.x + s.w / 2, s.y + s.h / 2 + 16)
+    }
 
     // Resize handle
     if (isSel) {
@@ -282,7 +316,7 @@ function drawLinks() {
       if (!dst) continue
 
       const seg = edgeSegment(src, link.srcDir, link.srcStart, link.srcEnd)
-      ctx.strokeStyle = '#e8a83044'
+      ctx.strokeStyle = '#e8a83077'
       ctx.lineWidth = 3
       ctx.lineCap = 'round'
       ctx.beginPath()
@@ -292,7 +326,7 @@ function drawLinks() {
 
       const srcPt = edgeMid(src, link.srcDir, link.srcStart, link.srcEnd)
       const dstPt = edgeMid(dst, opposite(link.srcDir), link.dstStart, link.dstEnd)
-      ctx.strokeStyle = '#e8a83020'
+      ctx.strokeStyle = '#e8a83044'
       ctx.lineWidth = 1
       ctx.setLineDash([3, 5])
       ctx.beginPath()

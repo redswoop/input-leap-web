@@ -11,11 +11,13 @@ I wanted to give back to a project that's saved me countless hours, so I built t
 ## What it does
 
 - **Visual topology editor** — drag-and-drop screen layout on a canvas. Screens snap to each other's edges, and split-edge links are generated automatically (e.g., two laptops sharing the bottom edge of an ultrawide).
-- **Per-screen settings** — click a screen to configure its modifier key remapping, aliases, and half-duplex options.
+- **Per-screen settings** — click a screen to configure its modifier key remapping, aliases, and half-duplex options. Changes auto-save and the server reloads automatically.
 - **Server controls** — start, stop, and restart the InputLeap server from the browser.
+- **Auto-reload** — config changes are applied to the running server automatically (SIGHUP on Unix, restart on Windows).
 - **Live logs** — server output streamed via WebSocket.
 - **Network accessible** — runs on `0.0.0.0:24802`, so you can configure the server from any machine on your LAN.
 - **Config generation** — generates the InputLeap config file format, including range-based edge intervals that the stock GUI can't produce.
+- **Real resolution display** — when clients are connected, screen boxes scale to match actual display aspect ratios and relative sizes.
 
 ## Screenshots
 
@@ -44,7 +46,7 @@ Then open [http://localhost:24802](http://localhost:24802) (production) or [http
 ## Requirements
 
 - Node.js 18+
-- InputLeap installed and available on `$PATH` (`input-leaps`, `input-leapc`)
+- InputLeap installed and available on `$PATH` (`input-leaps`, `input-leapc`), or a custom build with the status endpoint (see [fork](https://github.com/redswoop/input-leap))
 
 ## Architecture
 
