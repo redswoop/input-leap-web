@@ -7,6 +7,10 @@
     "start": "node server.js",
     "dev": "concurrently \"node server.js\" \"cd client && npx vite --host\"",
     "build": "cd client && npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:client": "cd client && npx vitest run",
+    "test:all": "vitest run && cd client && npx vitest run",
     "postinstall": "cd client && npm install"
   },
   "keywords": [
@@ -29,6 +33,7 @@
     "ws": "^8.20.0"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "vitest": "^4.1.2"
   }
 }

@@ -23,10 +23,10 @@ const { logs } = useWebSocket()
 const collapsed = ref(false)
 const logEl = ref(null)
 
-watch(logs, async () => {
+watch(() => logs.value.length, async () => {
   await nextTick()
   if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight
-}, { deep: true })
+})
 
 function logClass(line) {
   if (line.includes('NOTE:')) return 'level-note'

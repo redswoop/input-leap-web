@@ -15,6 +15,7 @@
             <button class="btn btn-danger btn-lg" @click="stop">Stop</button>
             <button class="btn btn-lg" @click="restart">Restart</button>
           </div>
+          <div v-if="error" class="error-msg">{{ error }}</div>
         </section>
 
         <!-- Process Options -->
@@ -174,36 +175,71 @@ function serverBody() {
   }
 }
 
+const error = ref('')
+
 async function start() {
-  await saveAll()
-  await fetch('/api/server/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(serverBody()),
-  })
+  error.value = ''
+  try {
+    await saveAll()
+    const res = await fetch('/api/server/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(serverBody()),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      error.value = body.error || `Start failed (${res.status})`
+    }
+  } catch (err) {
+    error.value = `Start failed: ${err.message}`
+  }
 }
 
 async function stop() {
-  await fetch('/api/server/stop', { method: 'POST' })
+  error.value = ''
+  try {
+    const res = await fetch('/api/server/stop', { method: 'POST' })
+    if (!res.ok) error.value = `Stop failed (${res.status})`
+  } catch (err) {
+    error.value = `Stop failed: ${err.message}`
+  }
 }
 
 async function restart() {
-  await saveAll()
-  await fetch('/api/server/restart', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(serverBody()),
-  })
+  error.value = ''
+  try {
+    await saveAll()
+    const res = await fetch('/api/server/restart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(serverBody()),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      error.value = body.error || `Restart failed (${res.status})`
+    }
+  } catch (err) {
+    error.value = `Restart failed: ${err.message}`
+  }
 }
 
 async function save() {
-  await saveAll()
+  error.value = ''
+  try {
+    await saveAll()
+  } catch (err) {
+    error.value = `Save failed: ${err.message}`
+  }
 }
 
+let copyTimer = null
 async function copy() {
-  await navigator.clipboard.writeText(configText.value)
-  copied.value = true
-  setTimeout(() => copied.value = false, 1500)
+  try {
+    await navigator.clipboard.writeText(configText.value)
+    copied.value = true
+    clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => copied.value = false, 1500)
+  } catch { /* clipboard not available */ }
 }
 </script>
 
@@ -340,4 +376,15 @@ async function copy() {
 .config-value { color: var(--text); }
 
 .copied { color: var(--green) !important; border-color: #66bb6a33 !important; }
+
+.error-msg {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: var(--red-bg);
+  border: 1px solid #ef535033;
+  border-radius: var(--radius);
+  color: var(--red);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
 </style>

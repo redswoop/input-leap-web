@@ -1,13 +1,18 @@
 // Compute links between adjacent screen edges.
 // Each screen: { name, x, y, w, h } (canvas units)
-// Returns array of link objects for the config.
+// Returns object keyed by screen name → array of link objects for the config.
 
+// Max gap (px) between edges that still counts as "adjacent".
+// Tuned for typical canvas scale where screens are ~200-400px wide.
 const SNAP_THRESHOLD = 14;
 
 export function detectEdges(screens) {
+  if (!Array.isArray(screens) || screens.length === 0) return {};
+
   const allLinks = {};
 
   for (const a of screens) {
+    if (!a || !a.name) continue;
     allLinks[a.name] = [];
   }
 
@@ -15,12 +20,18 @@ export function detectEdges(screens) {
     for (let j = i + 1; j < screens.length; j++) {
       const a = screens[i];
       const b = screens[j];
+      if (!a || !b || !a.name || !b.name) continue;
+      if (!isFinite(a.w) || !isFinite(a.h) || a.w <= 0 || a.h <= 0) continue;
+      if (!isFinite(b.w) || !isFinite(b.h) || b.w <= 0 || b.h <= 0) continue;
+
       const pairs = findAdjacentEdges(a, b);
       for (const { srcScreen, srcDir, srcStart, srcEnd, dstScreen, dstStart, dstEnd } of pairs) {
-        allLinks[srcScreen].push({
-          srcDir, srcStart, srcEnd,
-          dstScreen, dstStart, dstEnd,
-        });
+        if (allLinks[srcScreen]) {
+          allLinks[srcScreen].push({
+            srcDir, srcStart, srcEnd,
+            dstScreen, dstStart, dstEnd,
+          });
+        }
       }
     }
   }
@@ -35,8 +46,8 @@ function findAdjacentEdges(a, b) {
   if (Math.abs((a.x + a.w) - b.x) < SNAP_THRESHOLD) {
     const overlap = verticalOverlap(a, b);
     if (overlap) {
-      results.push(makeLink(a, 'right', b, 'left', overlap, 'vertical'));
-      results.push(makeLink(b, 'left', a, 'right', overlap, 'vertical'));
+      results.push(makeLink(a, 'right', b, overlap, 'vertical'));
+      results.push(makeLink(b, 'left', a, overlap, 'vertical'));
     }
   }
 
@@ -44,8 +55,8 @@ function findAdjacentEdges(a, b) {
   if (Math.abs((b.x + b.w) - a.x) < SNAP_THRESHOLD) {
     const overlap = verticalOverlap(b, a);
     if (overlap) {
-      results.push(makeLink(b, 'right', a, 'left', overlap, 'vertical'));
-      results.push(makeLink(a, 'left', b, 'right', overlap, 'vertical'));
+      results.push(makeLink(b, 'right', a, overlap, 'vertical'));
+      results.push(makeLink(a, 'left', b, overlap, 'vertical'));
     }
   }
 
@@ -53,8 +64,8 @@ function findAdjacentEdges(a, b) {
   if (Math.abs((a.y + a.h) - b.y) < SNAP_THRESHOLD) {
     const overlap = horizontalOverlap(a, b);
     if (overlap) {
-      results.push(makeLink(a, 'bottom', b, 'top', overlap, 'horizontal'));
-      results.push(makeLink(b, 'top', a, 'bottom', overlap, 'horizontal'));
+      results.push(makeLink(a, 'bottom', b, overlap, 'horizontal'));
+      results.push(makeLink(b, 'top', a, overlap, 'horizontal'));
     }
   }
 
@@ -62,12 +73,12 @@ function findAdjacentEdges(a, b) {
   if (Math.abs((b.y + b.h) - a.y) < SNAP_THRESHOLD) {
     const overlap = horizontalOverlap(b, a);
     if (overlap) {
-      results.push(makeLink(b, 'bottom', a, 'top', overlap, 'horizontal'));
-      results.push(makeLink(a, 'top', b, 'bottom', overlap, 'horizontal'));
+      results.push(makeLink(b, 'bottom', a, overlap, 'horizontal'));
+      results.push(makeLink(a, 'top', b, overlap, 'horizontal'));
     }
   }
 
-  return results;
+  return results.filter(r => r !== null);
 }
 
 function verticalOverlap(a, b) {
@@ -84,20 +95,27 @@ function horizontalOverlap(a, b) {
   return { left, right, aLeft: a.x, aW: a.w, bLeft: b.x, bW: b.w };
 }
 
-function makeLink(src, srcDir, dst, dstDir, overlap, axis) {
+function makeLink(src, srcDir, dst, overlap, axis) {
   let srcStart, srcEnd, dstStart, dstEnd;
 
   if (axis === 'vertical') {
-    srcStart = Math.round(((overlap.top - src.y) / src.h) * 100);
-    srcEnd = Math.round(((overlap.bot - src.y) / src.h) * 100);
-    dstStart = Math.round(((overlap.top - dst.y) / dst.h) * 100);
-    dstEnd = Math.round(((overlap.bot - dst.y) / dst.h) * 100);
+    srcStart = Math.ceil(((overlap.top - src.y) / src.h) * 100);
+    srcEnd = Math.floor(((overlap.bot - src.y) / src.h) * 100);
+    dstStart = Math.ceil(((overlap.top - dst.y) / dst.h) * 100);
+    dstEnd = Math.floor(((overlap.bot - dst.y) / dst.h) * 100);
   } else {
-    srcStart = Math.round(((overlap.left - src.x) / src.w) * 100);
-    srcEnd = Math.round(((overlap.right - src.x) / src.w) * 100);
-    dstStart = Math.round(((overlap.left - dst.x) / dst.w) * 100);
-    dstEnd = Math.round(((overlap.right - dst.x) / dst.w) * 100);
+    srcStart = Math.ceil(((overlap.left - src.x) / src.w) * 100);
+    srcEnd = Math.floor(((overlap.right - src.x) / src.w) * 100);
+    dstStart = Math.ceil(((overlap.left - dst.x) / dst.w) * 100);
+    dstEnd = Math.floor(((overlap.right - dst.x) / dst.w) * 100);
   }
+  // Clamp to valid range
+  srcStart = Math.max(0, srcStart);
+  srcEnd = Math.min(100, srcEnd);
+  dstStart = Math.max(0, dstStart);
+  dstEnd = Math.min(100, dstEnd);
+  // Skip degenerate ranges
+  if (srcEnd <= srcStart || dstEnd <= dstStart) return null;
 
   return {
     srcScreen: src.name, srcDir, srcStart, srcEnd,

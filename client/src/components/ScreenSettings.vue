@@ -172,18 +172,6 @@ const presetAvailable = computed(() => {
          pair === 'macos-linux' || pair === 'linux-macos'
 })
 
-const presetDescription = computed(() => {
-  const os = screenOS.value
-  const srv = serverPlatform.value
-  if ((os === 'macos' && srv === 'windows') || (os === 'macos' && srv === 'linux')) {
-    return 'Swap Option ↔ Command so muscle memory matches physical key positions on a Windows/Linux keyboard'
-  }
-  if ((os === 'windows' && srv === 'macos') || (os === 'linux' && srv === 'macos')) {
-    return 'Swap Alt ↔ Win so muscle memory matches physical key positions on a Mac keyboard'
-  }
-  return ''
-})
-
 function applyPreset() {
   if (!props.screen.options) props.screen.options = {}
   const os = screenOS.value

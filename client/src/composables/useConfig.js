@@ -88,15 +88,19 @@ function buildJSON() {
 }
 
 async function saveConfig() {
-  await fetch('/api/config', {
+  const res = await fetch('/api/config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(buildJSON()),
   })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || `Save config failed (${res.status})`)
+  }
 }
 
 async function saveLayout() {
-  await fetch('/api/layout', {
+  const res = await fetch('/api/layout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -108,6 +112,10 @@ async function saveLayout() {
       })),
     }),
   })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || `Save layout failed (${res.status})`)
+  }
 }
 
 async function saveAll() {
@@ -118,7 +126,7 @@ async function saveAll() {
 let layoutSaveTimer = null
 function debouncedSaveLayout() {
   clearTimeout(layoutSaveTimer)
-  layoutSaveTimer = setTimeout(() => saveLayout(), 1000)
+  layoutSaveTimer = setTimeout(() => saveLayout().catch(() => {}), 1000)
 }
 
 // ── Init ──
@@ -132,67 +140,77 @@ async function init() {
   // Fetch hostname + platform
   try {
     const res = await fetch('/api/hostname')
-    const data = await res.json()
-    serverName.value = data.hostname
-    serverPlatform.value = data.platform || ''
-  } catch { /* ignore */ }
+    if (res.ok) {
+      const data = await res.json()
+      serverName.value = data.hostname
+      serverPlatform.value = data.platform || ''
+    }
+  } catch { /* server not reachable yet */ }
 
   // Try loading saved layout
   try {
     const res = await fetch('/api/layout')
-    const layout = await res.json()
-    if (layout?.screens?.length) {
-      screens.value = layout.screens.map(s => ({
-        name: s.name, x: s.x, y: s.y, w: s.w, h: s.h,
-        os: s.os || null, options: s.options || {},
-        visible: s.visible !== false,
-        scaleFactor: s.scaleFactor || 1,
-      }))
+    if (res.ok) {
+      const layout = await res.json()
+      if (layout?.screens?.length) {
+        screens.value = layout.screens.map(s => ({
+          name: s.name, x: s.x, y: s.y, w: s.w, h: s.h,
+          os: s.os || null, options: s.options || {},
+          visible: s.visible !== false,
+          scaleFactor: s.scaleFactor || 1,
+        }))
+      }
     }
-  } catch { /* ignore */ }
+  } catch { /* layout not available */ }
 
   // Load existing InputLeap config and merge options/aliases
   try {
     const res = await fetch('/api/config')
-    const cfg = await res.json()
-    if (cfg) {
-      // Merge global options
-      if (cfg.options && Object.keys(cfg.options).length) {
-        options.value = { ...options.value, ...cfg.options }
-      }
-      // Merge aliases
-      if (cfg.aliases && Object.keys(cfg.aliases).length) {
-        aliases.value = cfg.aliases
-      }
-      // Merge per-screen options from config into layout screens
-      if (cfg.screens) {
-        for (const [name, opts] of Object.entries(cfg.screens)) {
-          const existing = screens.value.find(s => s.name === name)
-          if (existing && Object.keys(opts).length) {
-            existing.options = { ...existing.options, ...opts }
+    if (res.ok) {
+      const cfg = await res.json()
+      if (cfg) {
+        // Merge global options
+        if (cfg.options && Object.keys(cfg.options).length) {
+          options.value = { ...options.value, ...cfg.options }
+        }
+        // Merge aliases
+        if (cfg.aliases && Object.keys(cfg.aliases).length) {
+          aliases.value = cfg.aliases
+        }
+        // Merge per-screen options from config into layout screens
+        if (cfg.screens) {
+          for (const [name, opts] of Object.entries(cfg.screens)) {
+            const existing = screens.value.find(s => s.name === name)
+            if (existing && opts && Object.keys(opts).length) {
+              existing.options = { ...existing.options, ...opts }
+            }
           }
         }
       }
     }
-  } catch { /* ignore */ }
+  } catch { /* config not available */ }
 }
 
 // Poll InputLeap status endpoint for connected clients
 let pollStarted = false
+let pollIntervalId = null
+
 async function pollStatus() {
   try {
     const res = await fetch('/api/il-status')
-    const data = await res.json()
-    if (data?.clients) {
-      const map = {}
-      for (const c of data.clients) {
-        map[c.name] = {
-          width: c.width, height: c.height,
-          cursorX: c.cursorX, cursorY: c.cursorY,
-          active: c.active,
+    if (res.ok) {
+      const data = await res.json()
+      if (data?.clients) {
+        const map = {}
+        for (const c of data.clients) {
+          map[c.name] = {
+            width: c.width, height: c.height,
+            cursorX: c.cursorX, cursorY: c.cursorY,
+            active: c.active,
+          }
         }
+        connectedClients.value = map
       }
-      connectedClients.value = map
     }
   } catch { /* server not running */ }
 }
@@ -201,7 +219,15 @@ function startPolling() {
   if (pollStarted) return
   pollStarted = true
   pollStatus()
-  setInterval(pollStatus, 3000)
+  pollIntervalId = setInterval(pollStatus, 3000)
+}
+
+function stopPolling() {
+  if (pollIntervalId) {
+    clearInterval(pollIntervalId)
+    pollIntervalId = null
+  }
+  pollStarted = false
 }
 
 export function useConfig() {
@@ -211,5 +237,6 @@ export function useConfig() {
     screens, links, aliases, options, serverName, serverPlatform,
     connectedClients, visibleScreens,
     configText, saveConfig, saveLayout, saveAll, debouncedSaveLayout, buildJSON,
+    stopPolling,
   }
 }

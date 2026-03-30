@@ -25,7 +25,9 @@ const serverProc = new ServerProcess();
 function broadcast(type, data) {
   const msg = JSON.stringify({ type, data });
   for (const ws of wss.clients) {
-    if (ws.readyState === 1) ws.send(msg);
+    if (ws.readyState === 1) {
+      try { ws.send(msg); } catch { /* client gone */ }
+    }
   }
 }
 
@@ -71,17 +73,49 @@ function parseLogEvent(line) {
   return null;
 }
 
-// API routes
+// ── Validation helpers ──
+
+function isValidScreenName(name) {
+  return typeof name === 'string' && /^[\w.-]{1,64}$/.test(name);
+}
+
+function isValidAddress(addr) {
+  if (!addr) return true; // optional, has default
+  return typeof addr === 'string' && /^[:\w.-]{1,128}$/.test(addr);
+}
+
+function validateConfig(body) {
+  if (!body || typeof body !== 'object') return 'Request body must be a JSON object';
+  if (body.screens && typeof body.screens !== 'object') return 'screens must be an object';
+  if (body.links && typeof body.links !== 'object') return 'links must be an object';
+  if (body.aliases && typeof body.aliases !== 'object') return 'aliases must be an object';
+  if (body.options && typeof body.options !== 'object') return 'options must be an object';
+  return null;
+}
+
+// ── API routes ──
+
 app.get('/api/config', (req, res) => {
-  const cfg = config.load(CONFIG_PATH);
-  if (!cfg) return res.json({ screens: {}, links: {}, aliases: {}, options: {} });
-  res.json(cfg);
+  try {
+    const cfg = config.load(CONFIG_PATH);
+    if (!cfg) return res.json({ screens: {}, links: {}, aliases: {}, options: {} });
+    res.json(cfg);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load config', details: err.message });
+  }
 });
 
 app.post('/api/config', (req, res) => {
-  config.save(CONFIG_PATH, req.body);
-  const reloaded = serverProc.reload(CONFIG_PATH);
-  res.json({ ok: true, reloaded: reloaded || false });
+  const err = validateConfig(req.body);
+  if (err) return res.status(400).json({ error: err });
+
+  try {
+    config.save(CONFIG_PATH, req.body);
+    const reloaded = serverProc.reload(CONFIG_PATH);
+    res.json({ ok: true, reloaded: reloaded || false });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save config', details: err.message });
+  }
 });
 
 app.get('/api/hostname', (req, res) => {
@@ -99,12 +133,18 @@ app.get('/api/layout', (req, res) => {
     } else {
       res.json(null);
     }
-  } catch { res.json(null); }
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load layout', details: err.message });
+  }
 });
 
 app.post('/api/layout', (req, res) => {
-  fs.writeFileSync(LAYOUT_PATH, JSON.stringify(req.body, null, 2), 'utf8');
-  res.json({ ok: true });
+  try {
+    fs.writeFileSync(LAYOUT_PATH, JSON.stringify(req.body, null, 2), 'utf8');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save layout', details: err.message });
+  }
 });
 
 app.get('/api/status', (req, res) => {
@@ -126,8 +166,16 @@ app.get('/api/il-status', async (req, res) => {
 });
 
 app.post('/api/server/start', (req, res) => {
-  const { name, address, crypto } = req.body || {};
-  serverProc.start(CONFIG_PATH, { name, address, crypto });
+  const { name, address, crypto, debugLevel, logFile, dragDrop } = req.body || {};
+
+  if (name && !isValidScreenName(name)) {
+    return res.status(400).json({ error: 'Invalid server name' });
+  }
+  if (!isValidAddress(address)) {
+    return res.status(400).json({ error: 'Invalid address format' });
+  }
+
+  serverProc.start(CONFIG_PATH, { name, address, crypto, debugLevel, logFile, dragDrop });
   res.json({ ok: true });
 });
 
@@ -137,16 +185,53 @@ app.post('/api/server/stop', (req, res) => {
 });
 
 app.post('/api/server/restart', (req, res) => {
-  const { name, address, crypto } = req.body || {};
-  serverProc.restart(CONFIG_PATH, { name, address, crypto });
+  const { name, address, crypto, debugLevel, logFile, dragDrop } = req.body || {};
+
+  if (name && !isValidScreenName(name)) {
+    return res.status(400).json({ error: 'Invalid server name' });
+  }
+  if (!isValidAddress(address)) {
+    return res.status(400).json({ error: 'Invalid address format' });
+  }
+
+  serverProc.restart(CONFIG_PATH, { name, address, crypto, debugLevel, logFile, dragDrop });
   res.json({ ok: true });
+});
+
+// Global error handler — catches unhandled errors in route handlers
+app.use((err, req, res, _next) => {
+  console.error('Unhandled route error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // WebSocket connection
 wss.on('connection', (ws) => {
-  ws.send(JSON.stringify({ type: 'status', data: serverProc.getStatus() }));
+  try {
+    ws.send(JSON.stringify({ type: 'status', data: serverProc.getStatus() }));
+  } catch { /* client disconnected immediately */ }
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`InputLeap Web UI: http://localhost:${PORT}`);
-});
+// Graceful shutdown
+function shutdown() {
+  console.log('Shutting down...');
+  serverProc.destroy();
+  wss.close();
+  server.close(() => {
+    process.exit(0);
+  });
+  // Force exit after 5s if graceful shutdown stalls
+  setTimeout(() => process.exit(1), 5000).unref();
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+// Only start listening when run directly (not when imported for tests)
+if (require.main === module) {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`InputLeap Web UI: http://localhost:${PORT}`);
+  });
+}
+
+// Export for testing
+module.exports = { app, server, wss, serverProc, parseLogEvent, isValidScreenName, isValidAddress, validateConfig, PORT };

@@ -13,12 +13,13 @@ npm install          # installs both root and client deps (postinstall runs cd c
 npm run dev          # runs backend (Express :24802) + frontend (Vite :5173) concurrently with hot reload
 npm run build        # builds Vue client into public/ for production
 npm start            # runs production server (serves built frontend from public/)
+npm test             # runs backend tests (vitest, test/*.test.mjs)
+npm run test:client  # runs frontend tests (vitest, client/src/**/*.test.js)
+npm run test:all     # runs both backend + frontend tests
 ```
 
 Dev mode: open http://localhost:5173 (Vite proxies `/api` and `/ws` to :24802).
 Production: open http://localhost:24802.
-
-No test framework is configured.
 
 ## Architecture
 

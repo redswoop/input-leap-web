@@ -1,7 +1,7 @@
 <template>
   <div class="canvas-area" ref="container">
     <canvas ref="canvas" @mousedown="onMouseDown" @mousemove="onMouseMove" @mouseup="onMouseUp" @dblclick="onDblClick" />
-    <div class="canvas-hint">drag to move · resize at corner · double-click to rename</div>
+    <div class="canvas-hint">drag to move · double-click to rename</div>
   </div>
 </template>
 
@@ -11,8 +11,7 @@ import { detectEdges } from '../lib/edge-detection.js'
 import { useConfig } from '../composables/useConfig.js'
 
 const GRID_SIZE = 5
-const HANDLE_SIZE = 8
-const EDGE_SNAP = 12
+// resize removed — screen sizes come from real resolution data
 const COLORS = ['#4a9eff', '#ff6b6b', '#51cf66', '#ffd43b', '#cc5de8', '#ff922b']
 
 const container = ref(null)
@@ -21,7 +20,6 @@ const { screens, links, serverName, connectedClients, debouncedSaveLayout, saveA
 
 let ctx = null
 let dragging = null
-let resizing = null
 let selected = -1
 let resizeObserver = null
 
@@ -61,9 +59,6 @@ onMounted(() => {
 
   // Wait for hostname to load, then ensure server screen exists
   watch(serverName, () => ensureServerScreen(), { immediate: true })
-
-  // Apply resolution data if already available
-  resizeToResolution()
 })
 
 onUnmounted(() => {
@@ -72,65 +67,8 @@ onUnmounted(() => {
 
 watch(screens, () => draw(), { deep: true })
 
-// Resize screens to match real resolution proportionally, accounting for scale factors
-const BASE_SCALE = 0.08
-let lastResolutionKey = ''
-
-function resizeToResolution() {
-  const clients = connectedClients.value
-  const known = {}
-  for (const s of screens.value) {
-    const info = clients[s.name]
-    if (info && info.width > 0) {
-      const sf = s.scaleFactor || 1
-      known[s.name] = { w: info.width / sf, h: info.height / sf }
-    }
-  }
-
-  const knownKey = JSON.stringify(known)
-  if (knownKey === lastResolutionKey) { draw(); return }
-  lastResolutionKey = knownKey
-
-  if (Object.keys(known).length === 0) { draw(); return }
-
-  let maxW = 0
-  for (const r of Object.values(known)) {
-    if (r.w > maxW) maxW = r.w
-  }
-  const rect = container.value?.getBoundingClientRect()
-  const canvasW = rect ? rect.width : 800
-  const scale = Math.min(BASE_SCALE, (canvasW * 0.6) / maxW)
-
-  for (const s of screens.value) {
-    const r = known[s.name]
-    if (r) {
-      const newW = Math.round(r.w * scale)
-      const newH = Math.round(r.h * scale)
-      const cx = s.x + s.w / 2
-      const cy = s.y + s.h / 2
-      s.w = Math.max(60, newW)
-      s.h = Math.max(40, newH)
-      s.x = snap(cx - s.w / 2)
-      s.y = snap(cy - s.h / 2)
-    }
-  }
-
-  updateLinks()
-  debouncedSaveLayout()
-}
-
-watch(connectedClients, resizeToResolution, { deep: true })
-
-// Re-layout when scaleFactor changes on any screen
-let lastScaleKey = ''
-watch(screens, () => {
-  const scaleKey = screens.value.map(s => `${s.name}:${s.scaleFactor || 1}`).join(',')
-  if (scaleKey !== lastScaleKey) {
-    lastScaleKey = scaleKey
-    lastResolutionKey = '' // force re-layout
-    resizeToResolution()
-  }
-}, { deep: true })
+// Redraw when connected clients change (for status dots, resolution labels)
+watch(connectedClients, () => draw(), { deep: true })
 
 const emit = defineEmits(['select'])
 
@@ -265,13 +203,6 @@ function draw() {
       ctx.fillText(`${cInfo.width}×${cInfo.height}`, s.x + s.w / 2, s.y + s.h / 2 + 16)
     }
 
-    // Resize handle
-    if (isSel) {
-      ctx.fillStyle = color + '88'
-      ctx.beginPath()
-      ctx.roundRect(s.x + s.w - HANDLE_SIZE - 1, s.y + s.h - HANDLE_SIZE - 1, HANDLE_SIZE + 1, HANDLE_SIZE + 1, 2)
-      ctx.fill()
-    }
 
     ctx.globalAlpha = 1
 
@@ -378,15 +309,6 @@ function canvasPos(e) {
 function onMouseDown(e) {
   const { x, y } = canvasPos(e)
 
-  if (selected >= 0) {
-    const s = screens.value[selected]
-    if (x >= s.x + s.w - HANDLE_SIZE && y >= s.y + s.h - HANDLE_SIZE &&
-        x <= s.x + s.w && y <= s.y + s.h) {
-      resizing = { index: selected }
-      return
-    }
-  }
-
   for (let i = screens.value.length - 1; i >= 0; i--) {
     const s = screens.value[i]
     if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) {
@@ -407,39 +329,10 @@ function onMouseMove(e) {
 
   if (dragging) {
     const s = screens.value[dragging.index]
-    let nx = snap(x - dragging.offsetX)
-    let ny = snap(y - dragging.offsetY)
-
-    for (let i = 0; i < screens.value.length; i++) {
-      if (i === dragging.index) continue
-      const o = screens.value[i]
-      if (Math.abs((nx + s.w) - o.x) < EDGE_SNAP) nx = o.x - s.w
-      if (Math.abs(nx - (o.x + o.w)) < EDGE_SNAP) nx = o.x + o.w
-      if (Math.abs((ny + s.h) - o.y) < EDGE_SNAP) ny = o.y - s.h
-      if (Math.abs(ny - (o.y + o.h)) < EDGE_SNAP) ny = o.y + o.h
-      if (Math.abs(nx - o.x) < EDGE_SNAP) nx = o.x
-      if (Math.abs((nx + s.w) - (o.x + o.w)) < EDGE_SNAP) nx = o.x + o.w - s.w
-      if (Math.abs(ny - o.y) < EDGE_SNAP) ny = o.y
-      if (Math.abs((ny + s.h) - (o.y + o.h)) < EDGE_SNAP) ny = o.y + o.h - s.h
-    }
-
-    s.x = nx
-    s.y = ny
-    updateLinks()
-  } else if (resizing) {
-    const s = screens.value[resizing.index]
-    s.w = Math.max(60, snap(x - s.x))
-    s.h = Math.max(40, snap(y - s.y))
+    s.x = snap(x - dragging.offsetX)
+    s.y = snap(y - dragging.offsetY)
     updateLinks()
   } else {
-    if (selected >= 0) {
-      const s = screens.value[selected]
-      if (x >= s.x + s.w - HANDLE_SIZE && y >= s.y + s.h - HANDLE_SIZE &&
-          x <= s.x + s.w && y <= s.y + s.h) {
-        canvas.value.style.cursor = 'nwse-resize'
-        return
-      }
-    }
     for (const s of screens.value) {
       if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) {
         canvas.value.style.cursor = 'move'
@@ -452,7 +345,7 @@ function onMouseMove(e) {
 
 let saveTimer = null
 function onMouseUp() {
-  if (dragging || resizing) {
+  if (dragging) {
     updateLinks()
     debouncedSaveLayout()
     // Debounced full save so server reloads with new links
@@ -460,7 +353,6 @@ function onMouseUp() {
     saveTimer = setTimeout(() => saveAll(), 1200)
   }
   dragging = null
-  resizing = null
 }
 
 function onDblClick(e) {
@@ -468,7 +360,7 @@ function onDblClick(e) {
   for (const s of screens.value) {
     if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) {
       const newName = prompt('Screen name:', s.name)
-      if (newName?.trim()) {
+      if (newName?.trim() && newName.trim().length > 0) {
         s.name = newName.trim()
         updateLinks()
       }

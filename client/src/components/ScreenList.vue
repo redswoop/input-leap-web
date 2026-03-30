@@ -7,7 +7,7 @@
       <ul class="screen-list">
         <li
           v-for="(s, i) in screens"
-          :key="s.name"
+          :key="i"
           class="screen-item"
           :class="{ selected: selected === i, disconnected: !isConnected(s.name), hidden: s.visible === false }"
           @click="$emit('select', selected === i ? -1 : i)"
@@ -66,12 +66,12 @@ function osIcon(screen) {
 }
 
 function toggleVisible(screen) {
-  screen.visible = screen.visible === false ? true : false
+  screen.visible = !screen.visible
 }
 
 function addScreen() {
   const name = prompt('Screen name:')
-  if (name?.trim()) emit('add', name.trim())
+  if (name?.trim() && name.trim().length > 0) emit('add', name.trim())
 }
 </script>
 

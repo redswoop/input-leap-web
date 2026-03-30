@@ -194,25 +194,39 @@ function eventText(ev) {
 }
 
 async function start() {
-  await saveAll()
-  await fetch('/api/server/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: serverName.value }),
-  })
+  try {
+    await saveAll()
+    const res = await fetch('/api/server/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: serverName.value }),
+    })
+    if (!res.ok) console.error('Start failed:', res.status)
+  } catch (err) {
+    console.error('Start failed:', err)
+  }
 }
 
 async function stop() {
-  await fetch('/api/server/stop', { method: 'POST' })
+  try {
+    await fetch('/api/server/stop', { method: 'POST' })
+  } catch (err) {
+    console.error('Stop failed:', err)
+  }
 }
 
 async function restart() {
-  await saveAll()
-  await fetch('/api/server/restart', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: serverName.value }),
-  })
+  try {
+    await saveAll()
+    const res = await fetch('/api/server/restart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: serverName.value }),
+    })
+    if (!res.ok) console.error('Restart failed:', res.status)
+  } catch (err) {
+    console.error('Restart failed:', err)
+  }
 }
 </script>
 
